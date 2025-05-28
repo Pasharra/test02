@@ -1,0 +1,1 @@
+// Interaction Service: Handles like/dislike/favorite logic, comment creation/retrieval, and rate limiting. 

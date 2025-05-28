@@ -1,0 +1,1 @@
+// Auth Service: Handles Auth0 integration, login, signup, session, RBAC, and email verification. 
