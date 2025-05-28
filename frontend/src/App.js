@@ -1,10 +1,9 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import SignUp from './components/SignUp';
-import Login from './components/Login';
 import Header from './components/Header';
 import Profile from './components/Profile';
-import { CssBaseline, Box, Typography } from '@mui/material';
+import { CssBaseline, Box, Typography, Button } from '@mui/material';
+import { useAuth0 } from '@auth0/auth0-react';
 
 function PostFeed() {
   return (
@@ -15,17 +14,35 @@ function PostFeed() {
   );
 }
 
+function Landing() {
+  const { loginWithRedirect, isAuthenticated } = useAuth0();
+  if (isAuthenticated) return <Navigate to="/feed" replace />;
+  return (
+    <Box mt={10} textAlign="center">
+      <Typography variant="h3" mb={3}>AI Content Web App</Typography>
+      <Typography variant="body1" mb={4}>Sign up or log in to get started.</Typography>
+      <Button
+        variant="contained"
+        color="primary"
+        size="large"
+        onClick={() => loginWithRedirect()}
+      >
+        Log In / Sign Up
+      </Button>
+    </Box>
+  );
+}
+
 function App() {
   return (
     <Router>
       <CssBaseline />
       <Header />
       <Routes>
-        <Route path="/signup" element={<SignUp />} />
-        <Route path="/login" element={<Login />} />
         <Route path="/feed" element={<PostFeed />} />
         <Route path="/profile" element={<Profile />} />
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<Landing />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );
