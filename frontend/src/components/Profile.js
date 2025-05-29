@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import {
   Box, Typography, Avatar, Paper, TextField, Button, Stack, Alert, CircularProgress, IconButton
@@ -9,21 +9,38 @@ import DeleteIcon from '@mui/icons-material/Delete';
 const nameRegex = /^[A-Za-zА-Яа-яЁё\s'-]+$/;
 const MAX_AVATAR_SIZE = 2 * 1024 * 1024; // 2MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const BACKEND_URI = process.env.REACT_APP_BACKEND_URI || '';
 
 const Profile = () => {
-  const { user, isAuthenticated, getAccessTokenSilently } = useAuth0();
-  const [firstName, setFirstName] = useState(user?.given_name || '');
-  const [lastName, setLastName] = useState(user?.family_name || '');
-  const [avatar, setAvatar] = useState(user?.picture || '');
+  const { user, isAuthenticated, isLoading, getAccessTokenSilently } = useAuth0();
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [avatar, setAvatar] = useState('');
   const [avatarFile, setAvatarFile] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState(user?.picture || '');
+  const [avatarPreview, setAvatarPreview] = useState('');
   const [removeAvatar, setRemoveAvatar] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef();
 
-  if (!isAuthenticated) return null;
+  // Sync state with user when loaded
+  useEffect(() => {
+    if (user) {
+      setFirstName(user.given_name || '');
+      setLastName(user.family_name || '');
+      setAvatar(user.picture || '');
+      setAvatarPreview(user.picture || '');
+    }
+  }, [user]);
+
+  if (isLoading) {
+    return <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh"><CircularProgress /></Box>;
+  }
+
+  if (!isAuthenticated) {
+    return <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh"><Typography>Please log in</Typography></Box>;
+  }
 
   // Validation
   const isNameValid =
@@ -65,15 +82,34 @@ const Profile = () => {
     setSuccess('');
     setSaving(true);
     try {
-      let pictureData = avatarPreview;
-      if (avatarFile) {
-        pictureData = avatarPreview;
-      }
+      const accessToken = await getAccessTokenSilently();
+      let pictureData = avatar;
+      // If removing avatar
       if (removeAvatar) {
         pictureData = '';
+      } else if (avatarFile) {
+        // Upload to S3
+        const formData = new FormData();
+        formData.append('avatar', avatarFile);
+        const uploadRes = await fetch(`${BACKEND_URI}/api/profile/avatar/upload`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: formData,
+        });
+        if (!uploadRes.ok) {
+          let errorMsg = `Failed to upload avatar. (${uploadRes.status} ${uploadRes.statusText})`;
+          try {
+            const errData = await uploadRes.json();
+            if (errData && errData.error) errorMsg = errData.error;
+          } catch {}
+          throw new Error(errorMsg);
+        }
+        const uploadData = await uploadRes.json();
+        pictureData = uploadData.url;
       }
-      const accessToken = await getAccessTokenSilently();
-      const res = await fetch('/api/profile', {
+      const res = await fetch(`${BACKEND_URI}/api/profile`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -85,13 +121,22 @@ const Profile = () => {
           picture: pictureData,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not update profile.');
+      if (!res.ok) {
+        let errorMsg = `Could not update profile. (${res.status} ${res.statusText})`;
+        try {
+          const errData = await res.json();
+          if (errData && errData.error) errorMsg = errData.error;
+        } catch {}
+        throw new Error(errorMsg);
+      }
+      //const data = await res.json();
       setSuccess('Profile updated successfully.');
-      setAvatar(removeAvatar ? '' : avatarPreview);
+      setAvatar(removeAvatar ? '' : pictureData);
       setAvatarFile(null);
       setRemoveAvatar(false);
       setSaving(false);
+      //await getAccessTokenSilently({ ignoreCache: true });
+      //window.location.reload();
     } catch (err) {
       setError(err.message || 'Could not update profile. Please try again.');
       setSaving(false);

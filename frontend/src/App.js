@@ -6,6 +6,8 @@ import { CssBaseline, Box, Typography, Button } from '@mui/material';
 import { useAuth0 } from '@auth0/auth0-react';
 
 function PostFeed() {
+  const { isAuthenticated } = useAuth0();
+  console.log('isAuthenticated: ' + isAuthenticated);
   return (
     <Box mt={6} textAlign="center">
       <Typography variant="h4">Welcome to the AI Content Web App!</Typography>
@@ -16,6 +18,7 @@ function PostFeed() {
 
 function Landing() {
   const { loginWithRedirect, isAuthenticated } = useAuth0();
+  console.log('isAuthenticated: ' + isAuthenticated);
   if (isAuthenticated) return <Navigate to="/feed" replace />;
   return (
     <Box mt={10} textAlign="center">

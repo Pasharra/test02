@@ -2,7 +2,7 @@
 const axios = require('axios');
 
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN;
-const AUTHBan0_CLIENT_ID = process.env.AUTH0_CLIENT_ID;
+const AUTH0_CLIENT_ID = process.env.AUTH0_CLIENT_ID;
 const AUTH0_CLIENT_SECRET = process.env.AUTH0_CLIENT_SECRET;
 const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE || `https://${AUTH0_DOMAIN}/api/v2/`;
 
@@ -27,6 +27,8 @@ async function getManagementToken() {
  */
 async function updateUserProfile(userId, updates) {
   const token = await getManagementToken();
+  //console.log('Management API token: ', token);
+  console.log('userId: ', userId);
   const url = `https://${AUTH0_DOMAIN}/api/v2/users/${encodeURIComponent(userId)}`;
   const res = await axios.patch(url, updates, {
     headers: {
