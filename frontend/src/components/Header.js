@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AppBar, Toolbar, IconButton, Avatar, Menu, MenuItem, Typography, Box, Tooltip, Divider, Alert } from '@mui/material';
+import { AppBar, Toolbar, IconButton, Avatar, Menu, MenuItem, Box, Tooltip, Divider, Alert } from '@mui/material';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useNavigate } from 'react-router-dom';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
