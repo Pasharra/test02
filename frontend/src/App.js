@@ -2,6 +2,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Header from './components/Header';
 import Profile from './components/Profile';
+import SecuritySettings from './components/SecuritySettings';
+import Settings from './components/Settings';
 import { CssBaseline, Box, Typography, Button } from '@mui/material';
 import { useAuth0 } from '@auth0/auth0-react';
 
@@ -45,6 +47,7 @@ function App() {
         <Route path="/feed" element={<PostFeed />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/" element={<Landing />} />
+        <Route path="/settings/*" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

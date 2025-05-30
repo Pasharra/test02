@@ -46,7 +46,7 @@ const Header = () => {
 
   const handleSettings = () => {
     handleClose();
-    navigate('/settings'); // stub, not implemented yet
+    navigate('/settings/security');
   };
 
   const handleLogout = async () => {

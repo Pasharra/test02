@@ -21,6 +21,21 @@ async function getManagementToken() {
 }
 
 /**
+ * Get Auth0 user profile
+ * @param {string} userId - Auth0 user_id (e.g. 'auth0|abc123')
+ */
+async function getUserProfile(userId) {
+  const token = await getManagementToken();
+    const url = `https://${AUTH0_DOMAIN}/api/v2/users/${encodeURIComponent(userId)}`;
+    const response = await axios.get(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+  });
+  return response.data;
+}
+
+/**
  * Update Auth0 user profile (name fields and/or picture)
  * @param {string} userId - Auth0 user_id (e.g. 'auth0|abc123')
  * @param {object} updates - { given_name, family_name, picture }
@@ -28,7 +43,7 @@ async function getManagementToken() {
 async function updateUserProfile(userId, updates) {
   const token = await getManagementToken();
   //console.log('Management API token: ', token);
-  console.log('userId: ', userId);
+  //console.log('userId: ', userId);
   const url = `https://${AUTH0_DOMAIN}/api/v2/users/${encodeURIComponent(userId)}`;
   const res = await axios.patch(url, updates, {
     headers: {
@@ -39,7 +54,24 @@ async function updateUserProfile(userId, updates) {
   return res.data;
 }
 
+/**
+ * Resend Auth0 email verification
+ * @param {string} userId - Auth0 user_id (e.g. 'auth0|abc123')
+ */
+async function resendEmailVerification(userId) {
+  const token = await getManagementToken();
+    const url = `https://${AUTH0_DOMAIN}/api/v2/jobs/verification-email`;
+    const res = await axios.post(url, {
+      user_id: userId,
+      client_id: AUTH0_CLIENT_ID,
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  return res.data;
+}
+
 module.exports = {
-  getManagementToken,
+  getUserProfile,
   updateUserProfile,
+  resendEmailVerification,
 }; 
