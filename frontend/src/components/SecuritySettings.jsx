@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
+import { Box, Typography, Paper, Stack, TextField, Button, Alert, CircularProgress } from '@mui/material';
 
 const BACKEND_URI = process.env.REACT_APP_BACKEND_URI || '';
 
@@ -36,18 +37,8 @@ const SecuritySettings = () => {
         const res = await fetch(`${BACKEND_URI}/api/profile`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        //console.log(res);
-        if (!res.ok) {
-          //console.log('Could not fetch security info.');
-          let msg = `Could not fetch security info. (${res.status} ${res.statusText})`;
-          try {
-            const errData = await res.json();
-            if (errData && errData.error) msg = errData.error;
-          } catch {}
-          throw new Error(msg);
-        }
+        if (!res.ok) throw new Error('Could not fetch security info.');
         const data = await res.json();
-        //console.log(data);
         setEmail(data.email);
         setProvider(data.identities[0].provider);
         setEmailVerified(data.email_verified);
@@ -129,100 +120,101 @@ const SecuritySettings = () => {
     }
     setPwLoading(false);
   };
-  //console.log(isLoading, loading, isAuthenticated);
 
-  if (isLoading ||loading) return <div className="flex justify-center items-center min-h-[40vh] text-lg text-gray-600">Loading...</div>;
-  if (!isAuthenticated) return <div className="flex justify-center items-center min-h-[40vh] text-lg text-gray-600">Please log in</div>;
+  if (isLoading || loading) return <Box py={6} textAlign="center"><CircularProgress /></Box>;
+  if (!isAuthenticated) return <Box py={6} textAlign="center"><Typography>Please log in</Typography></Box>;
 
   return (
-    <>
-      {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-800 rounded text-center font-medium">
-          {error}
-        </div>
-      )}
-      <div>
-        <div className="mb-6">
-          <div className="mb-1 text-lg font-semibold text-gray-700">Email</div>
-          <div className="mb-2 text-gray-900 text-lg font-mono break-all">{email}</div>
-          {provider === 'google-oauth2' ? (
-            <>
-              <span className="inline-block px-3 py-1 rounded bg-green-100 text-green-700 text-sm font-medium mb-2">Verified via Google</span>
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded text-blue-800 text-sm font-medium flex items-center gap-2">
-                You signed up with Google. To change your email or password, please manage your account via Google Account settings. These options are not available here for social login users.
-              </div>
-            </>
-          ) : (
-            <>
-              {emailVerified ? (
-                <span className="inline-block px-3 py-1 rounded bg-green-100 text-green-700 text-sm font-medium">Verified</span>
-              ) : (
-                <>
-                  <span className="inline-block px-3 py-1 rounded bg-yellow-100 text-yellow-800 text-sm font-medium mb-2">Your email is not verified.</span>
-                  <div>
-                    <button
-                      className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 transition text-white rounded shadow disabled:opacity-50"
+    <Box p={3}>
+      <Typography variant="h5" mb={2}>Security Settings</Typography>
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      <Paper elevation={1} sx={{ p: 3, mb: 4, borderRadius: 2 }}>
+        <Stack spacing={2}>
+          <Box>
+            <Typography variant="subtitle1">Email</Typography>
+            <Typography color="text.secondary" sx={{ wordBreak: 'break-all' }}>{email}</Typography>
+            {provider === 'google-oauth2' ? (
+              <>
+                <Typography color="success.main" fontWeight={500} variant="body2" mt={1}>Verified via Google</Typography>
+                <Alert severity="info" sx={{ mt: 2 }}>
+                  You signed up with Google. To change your email or password, please manage your account via Google Account settings. These options are not available here for social login users.
+                </Alert>
+              </>
+            ) : (
+              <>
+                {emailVerified ? (
+                  <Typography color="success.main" fontWeight={500} variant="body2" mt={1}>Verified</Typography>
+                ) : (
+                  <>
+                    <Typography color="warning.main" fontWeight={500} variant="body2" mt={1}>Your email is not verified.</Typography>
+                    <Button
+                      variant="contained"
+                      sx={{ mt: 2, width: { xs: '100%', sm: 'auto' } }}
                       onClick={handleResend}
                       disabled={!!resendStatus}
                     >
                       Resend verification email
-                    </button>
-                  </div>
-                  {resendStatus && <div className="text-green-600 mt-2 font-medium">{resendStatus}</div>}
-                  {resendError && <div className="text-red-600 mt-2 font-medium">{resendError}</div>}
-                </>
-              )}
-            </>
-          )}
-        </div>
-        {provider !== 'google-oauth2' && (
-          <form onSubmit={handleChangePassword} className="space-y-5 bg-gray-50 p-6 rounded-xl border border-gray-200">
-            <div className="font-semibold text-lg mb-2 text-gray-700">Change Password</div>
-            <div className="space-y-3">
-              <input
+                    </Button>
+                    {resendStatus && <Alert severity="success" sx={{ mt: 2 }}>{resendStatus}</Alert>}
+                    {resendError && <Alert severity="error" sx={{ mt: 2 }}>{resendError}</Alert>}
+                  </>
+                )}
+              </>
+            )}
+          </Box>
+        </Stack>
+      </Paper>
+      {provider !== 'google-oauth2' && (
+        <Paper elevation={1} sx={{ p: 3, borderRadius: 2 }}>
+          <form onSubmit={handleChangePassword}>
+            <Stack spacing={2}>
+              <Typography variant="subtitle1">Change Password</Typography>
+              <TextField
                 type="password"
-                className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                placeholder="Current password"
+                label="Current password"
                 value={pwCurrent}
                 onChange={e => setPwCurrent(e.target.value)}
                 disabled={pwLoading}
                 autoComplete="current-password"
+                fullWidth
               />
-              <input
+              <TextField
                 type="password"
-                className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                placeholder="New password"
+                label="New password"
                 value={pwNew}
                 onChange={e => setPwNew(e.target.value)}
                 disabled={pwLoading}
                 autoComplete="new-password"
+                fullWidth
               />
-              <input
+              <TextField
                 type="password"
-                className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                placeholder="Confirm new password"
+                label="Confirm new password"
                 value={pwConfirm}
                 onChange={e => setPwConfirm(e.target.value)}
                 disabled={pwLoading}
                 autoComplete="new-password"
+                fullWidth
               />
-            </div>
-            {pwError && <div className="text-red-600 font-medium text-sm mt-1">{pwError}</div>}
-            {pwSuccess && <div className="text-green-600 font-medium text-sm mt-1">{pwSuccess}</div>}
-            <button
-              type="submit"
-              className="w-full py-2 bg-blue-600 hover:bg-blue-700 transition text-white rounded font-semibold disabled:opacity-50 shadow"
-              disabled={pwLoading}
-            >
-              {pwLoading ? 'Saving...' : 'Save'}
-            </button>
-            <div className="text-xs text-gray-500 mt-2">
-              Password must be at least 8 characters and include uppercase, lowercase, number, and special character.
-            </div>
+              {pwError && <Alert severity="error">{pwError}</Alert>}
+              {pwSuccess && <Alert severity="success">{pwSuccess}</Alert>}
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                disabled={pwLoading}
+                fullWidth
+              >
+                {pwLoading ? <CircularProgress size={20} /> : 'Save'}
+              </Button>
+              <Typography variant="caption" color="text.secondary">
+                Password must be at least 8 characters and include uppercase, lowercase, number, and special character.
+              </Typography>
+            </Stack>
           </form>
-        )}
-      </div>
-    </>
+        </Paper>
+      )}
+    </Box>
   );
 };
 
