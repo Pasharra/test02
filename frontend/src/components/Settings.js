@@ -2,6 +2,7 @@ import React from 'react';
 import { Tabs, Tab, Box, Typography, Paper } from '@mui/material';
 import { useNavigate, useLocation, Outlet, Routes, Route, Navigate } from 'react-router-dom';
 import SecuritySettings from './SecuritySettings';
+import NotificationsSettings from './NotificationsSettings';
 
 function TabPanel({ children, value, index }) {
   return (
@@ -43,7 +44,7 @@ export default function Settings() {
         <Box>
           <Routes>
             <Route path="security" element={<SecuritySettings />} />
-            <Route path="notifications" element={<Box p={3}><Typography variant="h6">Notification Settings (Coming soon)</Typography></Box>} />
+            <Route path="notifications" element={<NotificationsSettings />} />
             <Route path="subscription" element={<Box p={3}><Typography variant="h6">Subscription Settings (Coming soon)</Typography></Box>} />
             <Route path="" element={<Navigate to="security" replace />} />
           </Routes>
