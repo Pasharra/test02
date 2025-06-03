@@ -141,4 +141,27 @@ router.get('/', checkJwt, async (req, res) => {
   }
 });
 
+// POST /api/profile/notifications
+// Body: { email, sms, webpush, phone, phoneVerified }
+router.post('/notifications', checkJwt, async (req, res) => {
+  const user_id = req.auth && req.auth.sub;
+  if (!user_id) {
+    return res.status(400).json({ error: 'Missing required fields.' });
+  }
+  const { email, sms, webpush, phone, phoneVerified } = req.body;
+  console.log('notifications: ' + JSON.stringify(req.body));
+  try {
+    const updates = {
+      user_metadata: {
+        notifications: { email, sms, webpush, phone, phoneVerified }
+      }
+    };
+    const updated = await updateUserProfile(user_id, updates);
+    res.json({ success: true, user: updated });
+  } catch (err) {
+    console.error('Notification settings update error:', err.response?.data || err.message);
+    res.status(500).json({ error: 'Could not update notification settings. Please try again.' });
+  }
+});
+
 module.exports = router; 

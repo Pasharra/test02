@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Switch, Button, TextField, Alert, CircularProgress, Stack } from '@mui/material';
+import { useAuth0 } from '@auth0/auth0-react';
 
 const BACKEND_URI = process.env.REACT_APP_BACKEND_URI || '';
 
@@ -27,6 +28,7 @@ const initialState = {
 };
 
 export default function NotificationsSettings() {
+  const { getAccessTokenSilently, isAuthenticated, isLoading } = useAuth0();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [state, setState] = useState(initialState);
@@ -40,16 +42,20 @@ export default function NotificationsSettings() {
       setLoading(true);
       setError('');
       try {
-        // TODO: Replace with real API call
-        // Simulate API response
+        const token = await getAccessTokenSilently();
+        const res = await fetch(`${BACKEND_URI}/api/profile`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Failed to fetch profile');
+        const user = await res.json();
+        const notifications = user.user_metadata && user.user_metadata.notifications ? user.user_metadata.notifications : {};
         const prefs = {
-          email: true,
-          sms: false,
-          webpush: false,
-          phone: '',
-          phoneVerified: false,
+          email: notifications.email !== undefined ? notifications.email : true,
+          sms: notifications.sms || false,
+          webpush: notifications.webpush || false,
+          phone: notifications.phone || '',
+          phoneVerified: notifications.phoneVerified || false,
         };
-        // Web Push support check
         const webPushSupported = isWebPushSupported();
         if (mounted) {
           setState(s => ({
@@ -64,9 +70,9 @@ export default function NotificationsSettings() {
       }
       setLoading(false);
     }
-    fetchPrefs();
+    if (isAuthenticated && !isLoading) fetchPrefs();
     return () => { mounted = false; };
-  }, []);
+  }, [isAuthenticated, isLoading, getAccessTokenSilently]);
 
   // Handlers for toggles
   const handleToggle = (channel) => (e) => {
@@ -80,14 +86,13 @@ export default function NotificationsSettings() {
 
   const handleSendCode = async () => {
     setState(s => ({ ...s, codeSent: false, codeError: '', verifying: true }));
-    // Validate phone
     const phone = state.phoneInput.trim();
     if (!/^\+\d{10,15}$/.test(phone)) {
       setState(s => ({ ...s, phoneError: 'Please enter a valid phone number in international format (e.g., +12345678900).' }));
       return;
     }
     try {
-      // TODO: Replace with real API call to send code
+      // Simulate sending code (in real app, call backend to send SMS)
       await new Promise(res => setTimeout(res, 1000));
       setState(s => ({ ...s, codeSent: true, verifying: false }));
       setSuccess("We've sent a verification code to your phone.");
@@ -123,8 +128,22 @@ export default function NotificationsSettings() {
     setSuccess('');
     setError('');
     try {
-      // TODO: Replace with real API call to save preferences
-      await new Promise(res => setTimeout(res, 1000));
+      const token = await getAccessTokenSilently();
+      const res = await fetch(`${BACKEND_URI}/api/profile/notifications`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email: state.email,
+          sms: state.sms,
+          webpush: state.webpush,
+          phone: state.phone,
+          phoneVerified: state.phoneVerified,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to save preferences');
       setSuccess('Notification preferences updated.');
     } catch {
       setError('Could not update preferences. Please try again.');
