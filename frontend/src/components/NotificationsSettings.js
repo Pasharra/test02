@@ -86,7 +86,6 @@ export default function NotificationsSettings() {
 
   const handleSendCode = async () => {
     setState(s => ({ ...s, codeSent: false, codeError: '', verifying: true }));
-    setSentCode('');
     const phone = state.phoneInput.trim();
     if (!/^\+\d{10,15}$/.test(phone)) {
       setState(s => ({ ...s, phoneError: 'Please enter a valid phone number in international format (e.g., +12345678900).' }));

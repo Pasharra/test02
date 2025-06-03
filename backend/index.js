@@ -3,6 +3,7 @@ const express = require('express');
 const app = express();
 const profileRoute = require('./src/routes/profile');
 const notificationRoute = require('./src/routes/notification');
+const subscriptionRoute = require('./src/routes/subscription');
 
 app.use(express.json());
 
@@ -28,6 +29,7 @@ app.get('/health', (req, res) => {
 
 app.use('/api/profile', profileRoute);
 app.use('/api/notification', notificationRoute);
+app.use('/api/subscription', subscriptionRoute);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
