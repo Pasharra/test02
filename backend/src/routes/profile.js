@@ -6,6 +6,7 @@ const jwksRsa = require('jwks-rsa');
 const multer = require('multer');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const path = require('path');
+const { sendVerificationCode } = require('../services/notificationService');
 
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN;
 const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE || `https://${AUTH0_DOMAIN}/api/v2/`;
@@ -161,6 +162,26 @@ router.post('/notifications', checkJwt, async (req, res) => {
   } catch (err) {
     console.error('Notification settings update error:', err.response?.data || err.message);
     res.status(500).json({ error: 'Could not update notification settings. Please try again.' });
+  }
+});
+
+// POST /api/profile/notification
+// Body: { phone }
+router.post('/notification', checkJwt, async (req, res) => {
+  const user_id = req.auth && req.auth.sub;
+  const { phone } = req.body;
+  if (!user_id || !phone) {
+    return res.status(400).json({ error: 'Missing required fields.' });
+  }
+  // Generate a 6-digit code
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  try {
+    await sendVerificationCode(phone, code);
+    // TODO: Store code in a secure store (e.g., Redis) associated with user_id for later verification
+    res.json({ success: true, message: 'Verification code sent.', code }); // Return code for testing only
+  } catch (err) {
+    console.error('Send verification code error:', err.message);
+    res.status(500).json({ error: 'Could not send verification code.' });
   }
 });
 

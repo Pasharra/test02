@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const app = express();
 const profileRoute = require('./src/routes/profile');
+const notificationRoute = require('./src/routes/notification');
 
 app.use(express.json());
 
@@ -26,6 +27,7 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api/profile', profileRoute);
+app.use('/api/notification', notificationRoute);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

@@ -86,14 +86,36 @@ export default function NotificationsSettings() {
 
   const handleSendCode = async () => {
     setState(s => ({ ...s, codeSent: false, codeError: '', verifying: true }));
+    setSentCode('');
     const phone = state.phoneInput.trim();
     if (!/^\+\d{10,15}$/.test(phone)) {
       setState(s => ({ ...s, phoneError: 'Please enter a valid phone number in international format (e.g., +12345678900).' }));
       return;
     }
+    // If phone is already verified and matches, skip verification
+    if (state.phoneVerified && state.phone === phone) {
+      setState(s => ({ ...s, codeSent: false, verifying: false, phoneVerified: true }));
+      setSuccess('Phone number already verified.');
+      return;
+    }
     try {
-      // Simulate sending code (in real app, call backend to send SMS)
-      await new Promise(res => setTimeout(res, 1000));
+      const token = await getAccessTokenSilently();
+      const res = await fetch(`${BACKEND_URI}/api/notification/send-verification-code`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ phone }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error('Failed to send verification code');
+      // If backend says already verified, update state accordingly
+      if (data.message && data.message.includes('already verified')) {
+        setState(s => ({ ...s, codeSent: false, verifying: false, phoneVerified: true }));
+        setSuccess('Phone number already verified.');
+        return;
+      }
       setState(s => ({ ...s, codeSent: true, verifying: false }));
       setSuccess("We've sent a verification code to your phone.");
     } catch {
@@ -108,12 +130,26 @@ export default function NotificationsSettings() {
 
   const handleVerifyCode = async () => {
     setState(s => ({ ...s, verifying: true, codeError: '' }));
-    // TODO: Replace with real API call to verify code
-    await new Promise(res => setTimeout(res, 1000));
-    if (state.code === '123456') { // Simulate success
+    setError('');
+    setSuccess('');
+    try {
+      const token = await getAccessTokenSilently();
+      const res = await fetch(`${BACKEND_URI}/api/notification/verify-code`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ code: state.code, phone: state.phoneInput }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setState(s => ({ ...s, verifying: false, codeError: 'Verification failed. Please try again.' }));
+        return;
+      }
       setState(s => ({ ...s, phone: s.phoneInput, phoneVerified: true, sms: true, verifying: false, codeSent: false, code: '' }));
       setSuccess('Phone number verified. SMS notifications enabled.');
-    } else {
+    } catch {
       setState(s => ({ ...s, verifying: false, codeError: 'Verification failed. Please try again.' }));
     }
   };
