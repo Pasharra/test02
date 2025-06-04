@@ -2,24 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { sendVerificationCode } = require('../services/notificationService');
 const { updateUserProfile, getUserProfile } = require('../services/authService');
-const { expressjwt: jwt } = require('express-jwt');
-const jwksRsa = require('jwks-rsa');
+const { checkJwt } = require('../utils/authHelper');
 
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN;
 const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE || `https://${AUTH0_DOMAIN}/api/v2/`;
-
-// JWT middleware
-const checkJwt = jwt({
-  secret: jwksRsa.expressJwtSecret({
-    cache: true,
-    rateLimit: true,
-    jwksRequestsPerMinute: 5,
-    jwksUri: `https://${AUTH0_DOMAIN}/.well-known/jwks.json`,
-  }),
-  audience: AUTH0_AUDIENCE,
-  issuer: `https://${AUTH0_DOMAIN}/`,
-  algorithms: ['RS256'],
-});
 
 // POST /api/notification/send-verification-code
 // Body: { phone }

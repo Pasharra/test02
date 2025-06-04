@@ -1,14 +1,15 @@
 // Subscription Service: Handles Stripe integration, webhook listeners, subscription status updates, and trial logic. 
 
+const config = require('../utils/config');
 const Stripe = require('stripe');
-const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+const stripe = Stripe(config.STRIPE_SECRET_KEY);
 const { getUserProfile, updateUserProfile } = require('./authService');
 
-const MONTHLY_PRICE_ID = process.env.STRIPE_MONTHLY_PRICE_ID;
-const YEARLY_PRICE_ID = process.env.STRIPE_YEARLY_PRICE_ID;
-const SUCCESS_URL = process.env.STRIPE_SUCCESS_URL;
-const CANCEL_URL = process.env.STRIPE_CANCEL_URL;
-const CUSTOMER_PORTAL_RETURN_URL = process.env.STRIPE_CUSTOMER_PORTAL_RETURN_URL;
+const MONTHLY_PRICE_ID = config.STRIPE_MONTHLY_PRICE_ID;
+const YEARLY_PRICE_ID = config.STRIPE_YEARLY_PRICE_ID;
+const SUCCESS_URL = config.STRIPE_SUCCESS_URL;
+const CANCEL_URL = config.STRIPE_CANCEL_URL;
+const CUSTOMER_PORTAL_RETURN_URL = config.STRIPE_CUSTOMER_PORTAL_RETURN_URL;
 
 function getStripeCustomerId(user) {
   return user.user_metadata && user.user_metadata.stripe && user.user_metadata.stripe.stripeCustomerId;

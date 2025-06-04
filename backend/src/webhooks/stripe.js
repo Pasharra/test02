@@ -1,8 +1,9 @@
+const config = require('../utils/config');
 const express = require('express');
 const router = express.Router();
 const Stripe = require('stripe');
-const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
-//const { getUserProfile, updateUserProfile } = require('../services/authService');
+const stripe = Stripe(config.STRIPE_SECRET_KEY);
+const { getUserProfile, updateUserProfile } = require('../services/authService');
 
 // Install Stripe CLI (Recommended for Local Testing)
 // Login:
@@ -13,13 +14,13 @@ const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 // Ready! Your webhook signing secret is whsec_...
 // Add this to your .env:
 // STRIPE_WEBHOOK_SECRET=whsec_...
-//const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+const endpointSecret = config.STRIPE_WEBHOOK_SECRET;
 
 router.post('/', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event;
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig);//, endpointSecret);
+    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
   } catch (err) {
     console.error('Stripe webhook signature verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);

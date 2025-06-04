@@ -1,24 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { getSubscriptionStatus, createCheckoutSession, createCustomerPortalSession } = require('../services/subscriptionService');
-const { expressjwt: jwt } = require('express-jwt');
-const jwksRsa = require('jwks-rsa');
+const { checkJwt } = require('../utils/authHelper');
 
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN;
 const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE || `https://${AUTH0_DOMAIN}/api/v2/`;
-
-// JWT middleware (copied from profile.js)
-const checkJwt = jwt({
-  secret: jwksRsa.expressJwtSecret({
-    cache: true,
-    rateLimit: true,
-    jwksRequestsPerMinute: 5,
-    jwksUri: `https://${AUTH0_DOMAIN}/.well-known/jwks.json`,
-  }),
-  audience: AUTH0_AUDIENCE,
-  issuer: `https://${AUTH0_DOMAIN}/`,
-  algorithms: ['RS256'],
-});
 
 // GET /api/subscription/status
 router.get('/status', checkJwt, async (req, res) => {
