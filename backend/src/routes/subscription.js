@@ -3,9 +3,6 @@ const router = express.Router();
 const { getSubscriptionStatus, createCheckoutSession, createCustomerPortalSession } = require('../services/subscriptionService');
 const { checkJwt } = require('../utils/authHelper');
 
-const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN;
-const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE || `https://${AUTH0_DOMAIN}/api/v2/`;
-
 // GET /api/subscription/status
 router.get('/status', checkJwt, async (req, res) => {
   const userId = req.auth && req.auth.sub;

@@ -4,6 +4,7 @@ const config = require('../utils/config');
 const Stripe = require('stripe');
 const stripe = Stripe(config.STRIPE_SECRET_KEY);
 const { getUserProfile, updateUserProfile } = require('./authService');
+const { UserMetadata, StripeMetadata, SubscriptionData } = require('../models/UserMetadata');
 
 const MONTHLY_PRICE_ID = config.STRIPE_MONTHLY_PRICE_ID;
 const YEARLY_PRICE_ID = config.STRIPE_YEARLY_PRICE_ID;
@@ -12,13 +13,14 @@ const CANCEL_URL = config.STRIPE_CANCEL_URL;
 const CUSTOMER_PORTAL_RETURN_URL = config.STRIPE_CUSTOMER_PORTAL_RETURN_URL;
 
 function getStripeCustomerId(user) {
-  return user.user_metadata && user.user_metadata.stripe && user.user_metadata.stripe.stripeCustomerId;
+  const userMeta = UserMetadata.fromUser(user);
+  return userMeta.stripe.stripeCustomerId;
 }
 
 async function getOrCreateStripeCustomer(userId) {
-  // Try to get Stripe customer ID from Auth0 user_metadata
   let user = await getUserProfile(userId);
-  let stripeCustomerId = getStripeCustomerId(user);
+  let userMeta = UserMetadata.fromUser(user);
+  let stripeCustomerId = userMeta.stripe.stripeCustomerId;
   if (stripeCustomerId) {
     const customer = await stripe.customers.retrieve(stripeCustomerId);
     if (customer && !customer.deleted) return customer;
@@ -28,58 +30,54 @@ async function getOrCreateStripeCustomer(userId) {
     email: user.email,
     metadata: { auth0_user_id: userId },
   });
-  // Save to Auth0 user_metadata
-  const stripeMeta = { stripeCustomerId: customer.id, updated: new Date().toISOString() };
-  await updateUserProfile(userId, {
-    user_metadata: { ...user.user_metadata, stripe: stripeMeta },
-  });
+  userMeta.stripe.stripeCustomerId = customer.id;
+  userMeta.stripe.updated = new Date().toISOString();
+  await updateUserProfile(userId, { user_metadata: userMeta.toObject() });
   return customer;
 }
 
 async function getSubscriptionStatusInternal(subs = undefined) {
-    if (!subs || !subs.data.length) {
-        return { active: false, syncing: false, plan: '', renewal: '', status: '' };
-    }
-    // Take the most recently created subscription
-    const sub = subs.data.reduce((latest, s) => (!latest || s.created > latest.created ? s : latest), null);
-    // If status is incomplete, past_due, or requires_payment_method, treat as syncing
-    if (["incomplete", "past_due", "incomplete_expired", "unpaid"].includes(sub.status)) {
-        return { active: false, syncing: true, plan: '', renewal: '', status: sub.status };
-    }
-    // Otherwise, active or trialing
-    const plan = sub.items.data[0].price.id === MONTHLY_PRICE_ID ? 'Monthly' :
-        sub.items.data[0].price.id === YEARLY_PRICE_ID ? 'Yearly' :
-        'Unknown';
-    const renewal = new Date(sub.current_period_end * 1000).toLocaleDateString();
-    return {
-        active: ["active", "trialing"].includes(sub.status),
-        syncing: false,
-        plan,
-        renewal,
-        status: sub.status.charAt(0).toUpperCase() + sub.status.slice(1),
-    };
+  if (!subs || !subs.data.length) {
+    return new SubscriptionData();
+  }
+  // Take the most recently created subscription
+  const sub = subs.data.reduce((latest, s) => (!latest || s.created > latest.created ? s : latest), null);
+  // If status is incomplete, past_due, or requires_payment_method, treat as syncing
+  if (["incomplete", "past_due", "incomplete_expired", "unpaid"].includes(sub.status)) {
+    return new SubscriptionData({ active: false, syncing: true, plan: '', renewal: '', status: sub.status });
+  }
+  // Otherwise, active or trialing
+  const plan = sub.items.data[0].price.id === MONTHLY_PRICE_ID ? 'Monthly' :
+    sub.items.data[0].price.id === YEARLY_PRICE_ID ? 'Yearly' :
+    'Unknown';
+  const renewal = new Date(sub.current_period_end * 1000).toLocaleDateString();
+  return new SubscriptionData({
+    active: ["active", "trialing"].includes(sub.status),
+    syncing: false,
+    plan,
+    renewal,
+    status: sub.status.charAt(0).toUpperCase() + sub.status.slice(1),
+  });
 }
 
 async function getSubscriptionStatus(userId) {
   let user = await getUserProfile(userId);
-  let stripeCustomerId = getStripeCustomerId(user);
+  let userMeta = UserMetadata.fromUser(user);
+  let stripeCustomerId = userMeta.stripe.stripeCustomerId;
   if (!stripeCustomerId) {
     return getSubscriptionStatusInternal();
   }
-  let data = user.user_metadata.stripe;
-  let result = data.stripe;
+  let result = userMeta.stripe.subscription;
   // If data is less than 15 minutes old, return the cached result
-  if (result && result.active && data.updated && new Date(data.updated) > new Date(Date.now() - 1000 * 60 * 15)) {
-    return result;
+  if (result && result.active && userMeta.stripe.updated && new Date(userMeta.stripe.updated) > new Date(Date.now() - 1000 * 60 * 15)) {
+    return new SubscriptionData(result);
   }
   // Get all subscriptions for this customer
   const subs = await stripe.subscriptions.list({ customer: stripeCustomerId, status: 'all' });
   result = getSubscriptionStatusInternal(subs);
-  data.stripe = result;
-  data.updated = new Date().toISOString();
-  await updateUserProfile(userId, {
-    user_metadata: { ...user.user_metadata, stripe: data },
-  });
+  userMeta.stripe.subscription = result;
+  userMeta.stripe.updated = new Date().toISOString();
+  await updateUserProfile(userId, { user_metadata: userMeta.toObject() });
   return result;
 }
 
@@ -108,7 +106,8 @@ async function createCheckoutSession(userId, plan) {
 
 async function createCustomerPortalSession(userId) {
   let user = await getUserProfile(userId);
-  let stripeCustomerId = getStripeCustomerId(user);
+  let userMeta = UserMetadata.fromUser(user);
+  let stripeCustomerId = userMeta.stripe.stripeCustomerId;
   if (!stripeCustomerId) throw new Error('No Stripe customer');
   const session = await stripe.billingPortal.sessions.create({
     customer: stripeCustomerId,

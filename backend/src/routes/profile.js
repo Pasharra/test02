@@ -7,9 +7,6 @@ const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const path = require('path');
 const { sendVerificationCode } = require('../services/notificationService');
 
-const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN;
-const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE || `https://${AUTH0_DOMAIN}/api/v2/`;
-
 const s3 = new S3Client({
   region: process.env.AWS_REGION,
   credentials: {
@@ -121,6 +118,7 @@ router.get('/', checkJwt, async (req, res) => {
     const user_id = req.auth && req.auth.sub;
     if (!user_id) return res.status(401).json({ error: 'Unauthorized' });
     const user = await getUserProfile(user_id);
+    console.log('user: ' + JSON.stringify(user));
     res.json(user);
   } catch (err) {
     console.error('GET /api/profile error:', err.response?.data || err.message);

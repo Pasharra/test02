@@ -1,11 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { sendVerificationCode } = require('../services/notificationService');
-const { updateUserProfile, getUserProfile } = require('../services/authService');
+const { sendVerificationCode, getNotificationsMetadata, updateNotificationsMetadata } = require('../services/notificationService');
+const { getUserProfile } = require('../services/authService');
 const { checkJwt } = require('../utils/authHelper');
-
-const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN;
-const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE || `https://${AUTH0_DOMAIN}/api/v2/`;
+const { NotificationsMetadata } = require('../models/UserMetadata');
 
 // POST /api/notification/send-verification-code
 // Body: { phone }
@@ -18,7 +16,7 @@ router.post('/send-verification-code', checkJwt, async (req, res) => {
   try {
     // Fetch current notifications metadata
     const user = await getUserProfile(user_id);
-    const notifications = user.user_metadata && user.user_metadata.notifications ? user.user_metadata.notifications : {};
+    const notifications = getNotificationsMetadata(user);
     // If phone is already verified and matches, skip verification
     if (notifications.phone && notifications.phoneVerified === true && notifications.phone === phone) {
       return res.json({ success: true, message: 'Phone already verified.' });
@@ -27,17 +25,13 @@ router.post('/send-verification-code', checkJwt, async (req, res) => {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     await sendVerificationCode(phone, code);
     // Merge new fields
-    const updatedNotifications = {
+    const updatedNotifications = new NotificationsMetadata({
       ...notifications,
       verificationCode: code,
       phone,
       phoneVerified: false
-    };
-    await updateUserProfile(user_id, {
-      user_metadata: {
-        notifications: updatedNotifications
-      }
     });
+    await updateNotificationsMetadata(user_id, updatedNotifications);
     console.log(`Verification code for ${phone}: ${code}`);
     res.json({ success: true, message: 'Verification code sent.' });
   } catch (err) {
@@ -56,7 +50,7 @@ router.post('/verify-code', checkJwt, async (req, res) => {
   }
   try {
     const user = await getUserProfile(user_id);
-    const notifications = user.user_metadata && user.user_metadata.notifications ? user.user_metadata.notifications : {};
+    const notifications = getNotificationsMetadata(user);
     if (
       notifications.verificationCode &&
       notifications.verificationCode === code &&
@@ -64,15 +58,12 @@ router.post('/verify-code', checkJwt, async (req, res) => {
       notifications.phone === phone
     ) {
       // Mark phone as verified and clear code
-      await updateUserProfile(user_id, {
-        user_metadata: {
-          notifications: {
-            ...notifications,
-            phoneVerified: true,
-            verificationCode: undefined
-          }
-        }
+      const updatedNotifications = new NotificationsMetadata({
+        ...notifications,
+        phoneVerified: true,
+        verificationCode: undefined
       });
+      await updateNotificationsMetadata(user_id, updatedNotifications);
       res.json({ success: true, message: 'Phone number verified.' });
     } else {
       res.status(400).json({ error: 'Verification failed. Please try again.' });

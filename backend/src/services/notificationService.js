@@ -2,6 +2,7 @@
 
 const config = require('../utils/config');
 const twilio = require('twilio');
+const { UserMetadata, NotificationsMetadata } = require('../models/UserMetadata');
 
 const TWILIO_ACCOUNT_SID = config.TWILIO_ACCOUNT_SID;
 const TWILIO_AUTH_TOKEN = config.TWILIO_AUTH_TOKEN;
@@ -23,6 +24,26 @@ async function sendVerificationCode(phone, code) {
   });
 }
 
+/**
+ * Get notifications metadata from user
+ */
+function getNotificationsMetadata(user) {
+  const userMeta = UserMetadata.fromUser(user);
+  return userMeta.notifications;
+}
+
+/**
+ * Update notifications metadata for user
+ */
+async function updateNotificationsMetadata(userId, notifications) {
+  const user = await getUserProfile(userId);
+  const userMeta = UserMetadata.fromUser(user);
+  userMeta.notifications = notifications instanceof NotificationsMetadata ? notifications : new NotificationsMetadata(notifications);
+  await updateUserProfile(userId, { user_metadata: userMeta.toObject() });
+}
+
 module.exports = {
   sendVerificationCode,
+  getNotificationsMetadata,
+  updateNotificationsMetadata,
 }; 
