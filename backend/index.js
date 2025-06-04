@@ -1,6 +1,9 @@
 require('dotenv').config();
 const express = require('express');
 const app = express();
+const stripeWebhookRoute = require('./src/webhooks/stripe');
+// Stripe webhook must be registered before express.json()
+app.use('/webhooks/stripe', stripeWebhookRoute);
 const profileRoute = require('./src/routes/profile');
 const notificationRoute = require('./src/routes/notification');
 const subscriptionRoute = require('./src/routes/subscription');

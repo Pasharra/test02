@@ -43,8 +43,8 @@ export default function SubscriptionSettings() {
     if (isAuthenticated && !isLoading) fetchStatus();
   }, [isAuthenticated, isLoading, getAccessTokenSilently]);
 
-  const handleSubscribe = async () => {
-    setActionLoading(true);
+  const handleSubscribe = async (plan) => {
+    setActionLoading(plan);
     setError('');
     try {
       const token = await getAccessTokenSilently();
@@ -54,6 +54,7 @@ export default function SubscriptionSettings() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify({ plan }),
       });
       const data = await res.json();
       if (!res.ok || !data.url) throw new Error('Failed to create Stripe Checkout session');
@@ -99,9 +100,14 @@ export default function SubscriptionSettings() {
           {status === 'none' && (
             <>
               <Typography>You are not subscribed to premium content.</Typography>
-              <Button variant="contained" color="primary" onClick={handleSubscribe} disabled={actionLoading}>
-                {actionLoading ? <CircularProgress size={20} /> : 'Subscribe Now'}
-              </Button>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mt={2}>
+                <Button variant="contained" color="primary" onClick={() => handleSubscribe('monthly')} disabled={actionLoading}>
+                  {actionLoading === 'monthly' ? <CircularProgress size={20} /> : 'Subscribe Monthly ($0.99/mo)'}
+                </Button>
+                <Button variant="contained" color="secondary" onClick={() => handleSubscribe('yearly')} disabled={actionLoading}>
+                  {actionLoading === 'yearly' ? <CircularProgress size={20} /> : 'Subscribe Yearly ($10/yr)'}
+                </Button>
+              </Stack>
             </>
           )}
           {status === 'active' && (
