@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { Box, Typography, Paper, Stack, TextField, Button, Alert, CircularProgress } from '@mui/material';
+import { fetchUserProfile } from './Profile';
 
 const BACKEND_URI = process.env.REACT_APP_BACKEND_URI || '';
 
@@ -33,12 +34,7 @@ const SecuritySettings = () => {
       setLoading(true);
       setError("");
       try {
-        const token = await getAccessTokenSilently();
-        const res = await fetch(`${BACKEND_URI}/api/profile`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error('Could not fetch security info.');
-        const data = await res.json();
+        const data = await fetchUserProfile(getAccessTokenSilently, BACKEND_URI);
         setEmail(data.email);
         setProvider(data.identities[0].provider);
         setEmailVerified(data.email_verified);

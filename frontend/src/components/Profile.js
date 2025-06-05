@@ -11,6 +11,32 @@ const MAX_AVATAR_SIZE = 2 * 1024 * 1024; // 2MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const BACKEND_URI = process.env.REACT_APP_BACKEND_URI || '';
 
+export function isUserAdmin(auth0User) {
+  const roles = auth0User && auth0User["https://aiweb.app/roles"];
+  console.log('isUserAdmin roles: ' + roles);
+  return roles && roles.includes('Admin');
+}
+
+// Utility to fetch user profile
+export async function fetchUserProfile(getAccessTokenSilently, BACKEND_URI) {
+  const accessToken = await getAccessTokenSilently();
+  const res = await fetch(`${BACKEND_URI}/api/profile`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (!res.ok) {
+    let errorMsg = `Could not fetch profile. (${res.status} ${res.statusText})`;
+    try {
+      const errData = await res.json();
+      if (errData && errData.error) errorMsg = errData.error;
+    } catch {}
+    throw new Error(errorMsg);
+  }
+  return await res.json();
+}
+
 const Profile = () => {
   const { user, isAuthenticated, isLoading, getAccessTokenSilently } = useAuth0();
   const [firstName, setFirstName] = useState('');
@@ -33,22 +59,7 @@ const Profile = () => {
       if (!isAuthenticated) return;
       setError('');
       try {
-        const accessToken = await getAccessTokenSilently();
-        const res = await fetch(`${BACKEND_URI}/api/profile`, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        });
-        if (!res.ok) {
-          let errorMsg = `Could not fetch profile. (${res.status} ${res.statusText})`;
-          try {
-            const errData = await res.json();
-            if (errData && errData.error) errorMsg = errData.error;
-          } catch {}
-          throw new Error(errorMsg);
-        }
-        const data = await res.json();
+        const data = await fetchUserProfile(getAccessTokenSilently, BACKEND_URI);
         setFirstName(data.given_name || '');
         setLastName(data.family_name || '');
         setAvatar(data.picture || '');

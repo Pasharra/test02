@@ -6,6 +6,7 @@ const multer = require('multer');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const path = require('path');
 const { sendVerificationCode } = require('../services/notificationService');
+const UserData = require('../models/UserData');
 
 const s3 = new S3Client({
   region: process.env.AWS_REGION,
@@ -119,7 +120,8 @@ router.get('/', checkJwt, async (req, res) => {
     if (!user_id) return res.status(401).json({ error: 'Unauthorized' });
     const user = await getUserProfile(user_id);
     console.log('user: ' + JSON.stringify(user));
-    res.json(user);
+    const userData = UserData.fromAuth0User(user);
+    res.json(userData);
   } catch (err) {
     console.error('GET /api/profile error:', err.response?.data || err.message);
     res.status(500).json({ error: 'Failed to fetch user profile.' });

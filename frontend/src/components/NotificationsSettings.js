@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Switch, Button, TextField, Alert, CircularProgress, Stack } from '@mui/material';
 import { useAuth0 } from '@auth0/auth0-react';
+import { fetchUserProfile } from './Profile';
 
 const BACKEND_URI = process.env.REACT_APP_BACKEND_URI || '';
 
@@ -42,12 +43,7 @@ export default function NotificationsSettings() {
       setLoading(true);
       setError('');
       try {
-        const token = await getAccessTokenSilently();
-        const res = await fetch(`${BACKEND_URI}/api/profile`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error('Failed to fetch profile');
-        const user = await res.json();
+        const user = await fetchUserProfile(getAccessTokenSilently, BACKEND_URI);
         const notifications = user.user_metadata && user.user_metadata.notifications ? user.user_metadata.notifications : {};
         const prefs = {
           email: notifications.email !== undefined ? notifications.email : true,

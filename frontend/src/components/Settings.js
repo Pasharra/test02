@@ -1,17 +1,9 @@
 import React from 'react';
 import { Tabs, Tab, Box, Typography, Paper } from '@mui/material';
-import { useNavigate, useLocation, Outlet, Routes, Route, Navigate } from 'react-router-dom';
+import { useNavigate, useLocation, Routes, Route, Navigate } from 'react-router-dom';
 import SecuritySettings from './SecuritySettings';
 import NotificationsSettings from './NotificationsSettings';
 import SubscriptionSettings from './SubscriptionSettings';
-
-function TabPanel({ children, value, index }) {
-  return (
-    <div hidden={value !== index} role="tabpanel" style={{ width: '100%' }}>
-      {value === index && <Box sx={{ p: 2 }}>{children}</Box>}
-    </div>
-  );
-}
 
 const tabRoutes = [
   { label: 'Security', path: '/settings/security' },
