@@ -18,7 +18,7 @@ export function isUserAdmin(auth0User) {
 }
 
 // Utility to fetch user profile
-export async function fetchUserProfile(getAccessTokenSilently, BACKEND_URI) {
+export async function fetchUserProfile(getAccessTokenSilently) {
   const accessToken = await getAccessTokenSilently();
   const res = await fetch(`${BACKEND_URI}/api/profile`, {
     method: 'GET',
@@ -59,7 +59,7 @@ const Profile = () => {
       if (!isAuthenticated) return;
       setError('');
       try {
-        const data = await fetchUserProfile(getAccessTokenSilently, BACKEND_URI);
+        const data = await fetchUserProfile(getAccessTokenSilently);
         setFirstName(data.given_name || '');
         setLastName(data.family_name || '');
         setAvatar(data.picture || '');

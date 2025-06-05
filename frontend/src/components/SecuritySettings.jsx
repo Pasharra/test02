@@ -34,7 +34,7 @@ const SecuritySettings = () => {
       setLoading(true);
       setError("");
       try {
-        const data = await fetchUserProfile(getAccessTokenSilently, BACKEND_URI);
+        const data = await fetchUserProfile(getAccessTokenSilently);
         setEmail(data.email);
         setProvider(data.identities[0].provider);
         setEmailVerified(data.email_verified);

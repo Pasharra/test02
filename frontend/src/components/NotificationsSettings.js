@@ -43,7 +43,7 @@ export default function NotificationsSettings() {
       setLoading(true);
       setError('');
       try {
-        const user = await fetchUserProfile(getAccessTokenSilently, BACKEND_URI);
+        const user = await fetchUserProfile(getAccessTokenSilently);
         const notifications = user.user_metadata && user.user_metadata.notifications ? user.user_metadata.notifications : {};
         const prefs = {
           email: notifications.email !== undefined ? notifications.email : true,

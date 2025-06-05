@@ -4,16 +4,29 @@ import { useNavigate, useLocation, Routes, Route, Navigate } from 'react-router-
 import SecuritySettings from './SecuritySettings';
 import NotificationsSettings from './NotificationsSettings';
 import SubscriptionSettings from './SubscriptionSettings';
-
-const tabRoutes = [
-  { label: 'Security', path: '/settings/security' },
-  { label: 'Notifications', path: '/settings/notifications' },
-  { label: 'Subscription', path: '/settings/subscription' },
-];
+import { useAuth0 } from '@auth0/auth0-react';
+import { isUserAdmin } from './Profile';
 
 export default function Settings() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, isLoading } = useAuth0();
+
+  if (isLoading) return null;
+
+  const isAdmin = isUserAdmin(user);
+
+  // Only show Security tab for admin
+  const tabRoutes = isAdmin
+    ? [
+        { label: 'Security', path: '/settings/security' },
+      ]
+    : [
+        { label: 'Security', path: '/settings/security' },
+        { label: 'Notifications', path: '/settings/notifications' },
+        { label: 'Subscription', path: '/settings/subscription' },
+      ];
+
   const currentTab = tabRoutes.findIndex(tab => location.pathname.startsWith(tab.path));
   const tabValue = currentTab === -1 ? 0 : currentTab;
 
@@ -37,8 +50,8 @@ export default function Settings() {
         <Box>
           <Routes>
             <Route path="security" element={<SecuritySettings />} />
-            <Route path="notifications" element={<NotificationsSettings />} />
-            <Route path="subscription" element={<SubscriptionSettings />} />
+            {!isAdmin && <Route path="notifications" element={<NotificationsSettings />} />}
+            {!isAdmin && <Route path="subscription" element={<SubscriptionSettings />} />}
             <Route path="" element={<Navigate to="security" replace />} />
           </Routes>
         </Box>
