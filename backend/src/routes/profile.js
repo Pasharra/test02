@@ -7,6 +7,7 @@ const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const path = require('path');
 const { sendVerificationCode } = require('../services/notificationService');
 const UserData = require('../models/UserData');
+const { updateUserIfExists } = require('../services/contentService');
 
 const s3 = new S3Client({
   region: process.env.AWS_REGION,
@@ -33,6 +34,9 @@ router.post('/', checkJwt, async (req, res) => {
     if (picture !== undefined) updates.picture = picture;
     //console.log('updates: ' + JSON.stringify(updates));
     const updated = await updateUserProfile(user_id, updates);
+    // Sync to local DB if user exists
+    const userData = UserData.fromAuth0User(updated);
+    await updateUserIfExists(userData, user_id);
     res.json({ success: true, user: updated });
   } catch (err) {
     console.error('Profile update error:', err.response?.data || err.message);
