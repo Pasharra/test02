@@ -18,8 +18,10 @@ exports.up = async function(knex) {
     table.text('Image').nullable();
     table.text('Title').notNullable();
     table.text('Content').notNullable();
+    table.text('Preview').notNullable();
     table.integer('ReadingTime').nullable();
     table.timestamp('CreatedOn').notNullable().defaultTo(knex.fn.now());
+    table.timestamp('UpdatedOn').notNullable().defaultTo(knex.fn.now());
     table.boolean('IsPremium').nullable();
   });
 

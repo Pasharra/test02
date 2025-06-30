@@ -13,8 +13,10 @@ CREATE TABLE Posts (
     Image TEXT,
     Title TEXT NOT NULL,
     Content TEXT NOT NULL,
+    Preview TEXT NOT NULL,
     ReadingTime INTEGER,
     CreatedOn TIMESTAMP NOT NULL DEFAULT NOW(),
+    UpdatedOn TIMESTAMP NOT NULL DEFAULT NOW(),
     IsPremium BOOLEAN
 );
 
