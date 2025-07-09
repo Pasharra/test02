@@ -4,6 +4,7 @@ class PostData {
     image = '',
     title = '',
     content = '',
+    // TODO: calculate preview based on content
     preview = '',
     readingTime = null,
     createdOn = null,
@@ -14,8 +15,10 @@ class PostData {
     this.image = image;
     this.title = title;
     this.content = content;
+    this.preview = preview;
     this.readingTime = readingTime;
     this.createdOn = createdOn;
+    this.updatedOn = updatedOn;
     this.isPremium = isPremium;
   }
 

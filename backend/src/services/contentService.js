@@ -27,6 +27,17 @@ async function updateUserIfExists(userData, auth0Id) {
 }
 
 /**
+ * Verifies a user exists in the DB. Return the DB user Id if found, null otherwise.
+ * @param {string} auth0Id
+ * @returns {Promise<number>} The DB user Id
+ */
+async function tryGetUserId(auth0Id) {
+  if (!auth0Id) return null;
+  const [row] = await db('Users').where({ Auth0Id: auth0Id }).first();
+  return row ? row.Id : null;
+}
+
+/**
  * Ensure a user exists in the DB. If not, create it. Return the DB user Id.
  * @param {UserData} userData
  * @param {string} auth0Id
@@ -35,10 +46,8 @@ async function updateUserIfExists(userData, auth0Id) {
  */
 async function getOrCreateUser(userData, auth0Id, isAdmin = false) {
   // Try to find the user
-  const existing = await db('Users').where({ Auth0Id: auth0Id }).first();
-  if (existing) {
-    return existing.Id;
-  }
+  const userId = await tryGetUserId(auth0Id);
+  if (userId) return userId;
   // Insert new user
   const insertFields = {
     Avatar: userData.picture,
@@ -97,6 +106,7 @@ async function updatePost(postData) {
  * @param {number} offset - Optional offset for pagination (default: 0)
  * @returns {Promise<PostListData[]>} Array of PostListData objects
  */
+// TODO: add search parameters - title & labels
 async function getPostList(userId = null, limit = 50, offset = 0) {
   // Build the main query with subqueries for aggregated data
   const query = db('Posts as p')
@@ -168,4 +178,5 @@ module.exports = {
   updatePost,
   getOrCreateUser,
   getPostList,
+  tryGetUserId,
 }; 

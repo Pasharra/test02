@@ -90,6 +90,7 @@ router.post('/avatar/upload', checkJwt, upload.single('avatar'), async (req, res
   if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
   const user_id = req.auth && req.auth.sub;
   //console.log('api/avatar/upload user_id: ' + user_id);
+  if (!user_id) return res.status(401).json({ error: 'Unauthorized' });
   const ext = path.extname(req.file.originalname).toLowerCase();
   if (!['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) {
     return res.status(400).json({ error: 'Invalid file type.' });
