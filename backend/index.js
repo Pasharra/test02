@@ -8,6 +8,7 @@ app.use('/webhooks/stripe', stripeWebhookRoute);
 const profileRoute = require('./src/routes/profile');
 const notificationRoute = require('./src/routes/notification');
 const subscriptionRoute = require('./src/routes/subscription');
+const contentRoute = require('./src/routes/content');
 
 app.use(express.json());
 
@@ -32,6 +33,7 @@ app.get('/health', (req, res) => {
 app.use('/api/profile', profileRoute);
 app.use('/api/notification', notificationRoute);
 app.use('/api/subscription', subscriptionRoute);
+app.use('/api/content', contentRoute);
 
 const PORT = config.PORT;
 app.listen(PORT, () => {

@@ -1,0 +1,37 @@
+class PostDetailData {
+  constructor({
+    id = null,
+    image = '',
+    title = '',
+    content = '',
+    preview = '',
+    readingTime = null,
+    createdOn = null,
+    updatedOn = null,
+    isPremium = null,
+    reaction = null,
+    numberOfLikes = null,
+    numberOfDislikes = null,
+    numberOfComments = null,
+    labels = [],
+    comments = [],
+  } = {}) {
+    this.id = id;
+    this.image = image;
+    this.title = title;
+    this.content = content;
+    this.preview = preview;
+    this.readingTime = readingTime;
+    this.createdOn = createdOn;
+    this.updatedOn = updatedOn;
+    this.isPremium = isPremium;
+    this.reaction = reaction;
+    this.numberOfLikes = numberOfLikes;
+    this.numberOfDislikes = numberOfDislikes;
+    this.numberOfComments = numberOfComments;
+    this.labels = labels;
+    this.comments = comments;
+  }
+}
+
+module.exports = PostDetailData; 

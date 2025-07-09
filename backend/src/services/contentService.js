@@ -4,6 +4,8 @@ const db = require('../db');
 const UserData = require('../models/UserData');
 const PostData = require('../models/PostData');
 const PostListData = require('../models/PostListData');
+const PostDetailData = require('../models/PostDetailData');
+const CommentData = require('../models/CommentData');
 
 /**
  * Update a user in the database by Auth0Id with data from a UserData object.
@@ -70,7 +72,7 @@ async function createPost(postData) {
     Image: postData.image,
     Title: postData.title,
     Content: postData.content,
-    Preview: postData.preview,
+    Preview: truncateContent(postData.content),
     ReadingTime: postData.readingTime,
     CreatedOn: db.fn.now(),
     UpdatedOn: db.fn.now(),
@@ -85,15 +87,20 @@ async function createPost(postData) {
  */
 async function updatePost(postData) {
   if (!postData.id) throw new Error('Post id is required for update');
-  const updateFields = {
-    Image: postData.image,
-    Title: postData.title,
-    Content: postData.content,
-    Preview: postData.preview,
-    ReadingTime: postData.readingTime,
-    UpdatedOn: db.fn.now(),
-    IsPremium: postData.isPremium,
-  };
+  const updateFields = {};
+  
+  // Only update fields that are provided
+  if (postData.image !== undefined) updateFields.Image = postData.image;
+  if (postData.title !== undefined) updateFields.Title = postData.title;
+  if (postData.content !== undefined) {
+    updateFields.Content = postData.content;
+    updateFields.Preview = truncateContent(postData.content);
+  }
+  if (postData.readingTime !== undefined) updateFields.ReadingTime = postData.readingTime;
+  if (postData.isPremium !== undefined) updateFields.IsPremium = postData.isPremium;
+  
+  updateFields.UpdatedOn = db.fn.now();
+  
   await db('Posts')
     .where({ Id: postData.id })
     .update(updateFields);
@@ -172,11 +179,107 @@ async function getPostList(userId = null, limit = 50, offset = 0) {
   }));
 }
 
+/**
+ * Get a single post by ID with aggregated data.
+ * @param {number} postId - The post ID to retrieve
+ * @param {number} userId - Optional user ID to get user-specific reactions
+ * @returns {Promise<PostDetailData|null>} PostDetailData object or null if not found
+ */
+async function getPostById(postId, userId = null) {
+  // Build the query with subqueries for aggregated data
+  const query = db('Posts as p')
+    .select([
+      'p.Id as id',
+      'p.Image as image',
+      'p.Title as title',
+      'p.Content as content',
+      'p.Preview as preview',
+      'p.ReadingTime as readingTime',
+      'p.CreatedOn as createdOn',
+      'p.UpdatedOn as updatedOn',
+      'p.IsPremium as isPremium',
+      // User's reaction (if userId provided)
+      userId ? 
+        db.raw(`(SELECT upr.Reaction FROM UserPostReaction upr WHERE upr.PostId = p.Id AND upr.UserId = ?) as reaction`, [userId]) :
+        db.raw('NULL as reaction'),
+      // Count of likes (reaction = 1)
+      db.raw(`(SELECT COUNT(*) FROM UserPostReaction upr WHERE upr.PostId = p.Id AND upr.Reaction = 1) as numberOfLikes`),
+      // Count of dislikes (reaction = -1)
+      db.raw(`(SELECT COUNT(*) FROM UserPostReaction upr WHERE upr.PostId = p.Id AND upr.Reaction = -1) as numberOfDislikes`),
+      // Count of comments
+      db.raw(`(SELECT COUNT(*) FROM PostComments pc WHERE pc.PostId = p.Id) as numberOfComments`)
+    ])
+    .where('p.Id', postId)
+    .first();
+
+  const post = await query;
+  
+  if (!post) {
+    return null;
+  }
+
+  // Get labels for this post
+  const labelsQuery = await db('PostLabels as pl')
+    .join('Labels as l', 'pl.LabelId', 'l.Id')
+    .select('l.Caption')
+    .where('pl.PostId', postId);
+
+  const labels = labelsQuery.map(row => row.Caption);
+
+  // Return PostDetailData object (which includes content field)
+  return new PostDetailData({
+    id: post.id,
+    image: post.image,
+    title: post.title,
+    content: post.content,
+    preview: post.preview,
+    readingTime: post.readingTime,
+    createdOn: post.createdOn,
+    updatedOn: post.updatedOn,
+    isPremium: post.isPremium,
+    reaction: post.reaction,
+    numberOfLikes: parseInt(post.numberOfLikes) || 0,
+    numberOfDislikes: parseInt(post.numberOfDislikes) || 0,
+    numberOfComments: parseInt(post.numberOfComments) || 0,
+    labels: labels
+  });
+}
+
+/**
+ * Truncate text to maximum of 500 characters, ending at word boundary
+ * @param {string} text - The text to truncate
+ * @returns {string} Truncated text with "..." appended if truncated
+ */
+function truncateContent(text) {
+  if (!text || typeof text !== 'string') {
+    return '';
+  }
+  
+  // If text is already 500 characters or less, return as is
+  if (text.length <= 500) {
+    return text;
+  }
+  
+  // Find the last space within the first 500 characters
+  const truncated = text.substring(0, 500);
+  const lastSpaceIndex = truncated.lastIndexOf(' ');
+  
+  // If no space found, just truncate at 500 characters
+  if (lastSpaceIndex === -1) {
+    return truncated + '...';
+  }
+  
+  // Truncate at the last word boundary and append "..."
+  return truncated.substring(0, lastSpaceIndex) + '...';
+}
+
 module.exports = {
   updateUserIfExists,
   createPost,
   updatePost,
   getOrCreateUser,
   getPostList,
+  getPostById,
   tryGetUserId,
+  truncateContent,
 }; 

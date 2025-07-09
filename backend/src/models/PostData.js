@@ -4,7 +4,6 @@ class PostData {
     image = '',
     title = '',
     content = '',
-    // TODO: calculate preview based on content
     preview = '',
     readingTime = null,
     createdOn = null,

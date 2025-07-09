@@ -14,4 +14,24 @@ const checkJwt = jwt({
   algorithms: ['RS256'],
 });
 
-module.exports = { checkJwt }; 
+/**
+ * Check if the authenticated user has admin role
+ * @param {object} req - Express request object with auth token
+ * @returns {boolean} - True if user is admin
+ */
+function isUserAdmin(req) {
+  const roles = req.auth && req.auth["https://aiweb.app/roles"];
+  return roles && roles.includes('Admin');
+}
+
+/**
+ * Middleware to check if user is admin
+ */
+function checkAdmin(req, res, next) {
+  if (!isUserAdmin(req)) {
+    return res.status(403).json({ error: 'Admin access required.' });
+  }
+  next();
+}
+
+module.exports = { checkJwt, isUserAdmin, checkAdmin }; 
