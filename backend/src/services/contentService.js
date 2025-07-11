@@ -6,6 +6,8 @@ const PostData = require('../models/PostData');
 const PostListData = require('../models/PostListData');
 const PostDetailData = require('../models/PostDetailData');
 const CommentData = require('../models/CommentData');
+const MetricsData = require('../models/MetricsData');
+const { getNumberOfActiveSubscriptions } = require('./subscriptionService');
 
 /**
  * Verifies a user exists in the DB. Return the DB user Id if found, null otherwise.
@@ -287,6 +289,49 @@ function truncateContent(text) {
   return truncated.substring(0, lastSpaceIndex) + '...';
 }
 
+/**
+ * Get metrics data for the dashboard.
+ * @returns {Promise<MetricsData>} MetricsData object
+ */
+async function getMetrics() {
+  try {
+    // Call stored procedures and get active subscriptions in parallel
+    const [dbResult, activeSubscriptions, mostLikedResult, mostCommentedResult] = await Promise.all([
+      db.raw('SELECT * FROM get_dashboard_metrics()'),
+      getNumberOfActiveSubscriptions(),
+      db.raw('SELECT * FROM get_most_liked_posts(5)'),
+      db.raw('SELECT * FROM get_most_commented_posts(5)')
+    ]);
+    
+    const metrics = dbResult.rows[0];
+    const top5MostLikedPosts = mostLikedResult.rows.map(row => new PostListData({
+      title: row.title,
+      numberOfLikes: parseInt(row.number_of_likes) || 0
+    }));
+    const top5MostCommentedPosts = mostCommentedResult.rows.map(row => new PostListData({
+      title: row.title,
+      numberOfComments: parseInt(row.number_of_comments) || 0
+    }));
+    
+    // Create MetricsData object with the stored procedure results and subscription count
+    return new MetricsData({
+      totalUsers: parseInt(metrics.total_users) || 0,
+      newUsersInLast7Days: parseInt(metrics.new_users_in_last_7_days) || 0,
+      newUsersInLast30Days: parseInt(metrics.new_users_in_last_30_days) || 0,
+      totalPublishedPosts: parseInt(metrics.total_published_posts) || 0,
+      newPublishedPostsInLast7Days: parseInt(metrics.new_published_posts_in_last_7_days) || 0,
+      newPublishedPostsInLast30Days: parseInt(metrics.new_published_posts_in_last_30_days) || 0,
+      totalActiveSubscriptions: activeSubscriptions,
+      top5MostLikedPosts: top5MostLikedPosts,
+      top5MostCommentedPosts: top5MostCommentedPosts,
+    });
+  } catch (error) {
+    console.error('Error getting metrics:', error);
+    // Return empty MetricsData object on error
+    return new MetricsData();
+  }
+}
+
 module.exports = {
   updateUser,
   createPost,
@@ -296,4 +341,5 @@ module.exports = {
   getPostById,
   tryGetUserId,
   truncateContent,
+  getMetrics,
 }; 

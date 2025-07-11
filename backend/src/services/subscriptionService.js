@@ -116,8 +116,54 @@ async function createCustomerPortalSession(userId) {
   return { url: session.url };
 }
 
+/**
+ * Get the total number of active subscriptions from Stripe
+ * @returns {Promise<number>} Number of active subscriptions
+ */
+async function getNumberOfActiveSubscriptions() {
+  try {
+    let totalActiveSubscriptions = 0;
+    let hasMore = true;
+    let startingAfter = null;
+    
+    // Iterate through all subscriptions with pagination
+    while (hasMore) {
+      const params = {
+        status: 'active',
+        limit: 100, // Maximum allowed by Stripe
+      };
+      
+      if (startingAfter) {
+        params.starting_after = startingAfter;
+      }
+      
+      const subscriptions = await stripe.subscriptions.list(params);
+      
+      // Count active and trialing subscriptions
+      const activeCount = subscriptions.data.filter(sub => 
+        ['active', 'trialing'].includes(sub.status)
+      ).length;
+      
+      totalActiveSubscriptions += activeCount;
+      
+      // Check if there are more subscriptions to fetch
+      hasMore = subscriptions.has_more;
+      if (hasMore && subscriptions.data.length > 0) {
+        startingAfter = subscriptions.data[subscriptions.data.length - 1].id;
+      }
+    }
+    
+    return totalActiveSubscriptions;
+  } catch (error) {
+    console.error('Error getting number of active subscriptions:', error);
+    // Return 0 on error to avoid breaking the metrics
+    return 0;
+  }
+}
+
 module.exports = {
   getSubscriptionStatus,
   createCheckoutSession,
   createCustomerPortalSession,
+  getNumberOfActiveSubscriptions,
 }; 
