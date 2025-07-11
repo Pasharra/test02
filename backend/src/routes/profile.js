@@ -36,7 +36,7 @@ router.post('/', checkJwt, async (req, res) => {
     const updated = await updateUserProfile(user_id, updates);
     // Sync to local DB if user exists
     const userData = UserData.fromAuth0User(updated);
-    await updateUserIfExists(userData, user_id);
+    await updateUser(userData, user_id, isUserAdmin(req));
     res.json({ success: true, user: updated });
   } catch (err) {
     console.error('Profile update error:', err.response?.data || err.message);

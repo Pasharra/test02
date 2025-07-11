@@ -8,12 +8,48 @@ const PostDetailData = require('../models/PostDetailData');
 const CommentData = require('../models/CommentData');
 
 /**
+ * Verifies a user exists in the DB. Return the DB user Id if found, null otherwise.
+ * @param {string} auth0Id
+ * @returns {Promise<number>} The DB user Id
+ */
+async function tryGetUserId(auth0Id) {
+  if (!auth0Id) return null;
+  const [row] = await db('Users').where({ Auth0Id: auth0Id }).first();
+  return row ? row.Id : null;
+}
+
+/**
+ * Create a user in the DB. Return the DB user Id.
+ * @param {UserData} userData
+ * @param {string} auth0Id
+ * @param {boolean} isAdmin
+ * @returns {Promise<number>} The DB user Id
+ */
+async function createUser(userData, auth0Id, isAdmin = false) {
+  // Insert new user
+  const insertFields = {
+    Avatar: userData.picture,
+    FirstName: userData.given_name,
+    LastName: userData.family_name,
+    Email: userData.email,
+    Auth0Id: auth0Id,
+    IsAdmin: !!isAdmin,
+  };
+  const [row] = await db('Users').insert(insertFields).returning('*');
+  return row.Id;
+}
+
+/**
  * Update a user in the database by Auth0Id with data from a UserData object.
  * @param {UserData} userData - The user data to update.
  * @param {string} auth0Id - The Auth0 user id.
- * @returns {Promise<object|null>} The updated user row, or null if not found.
+ * @param {boolean} isAdmin
+ * @returns {Promise<number>} The DB user Id
  */
-async function updateUserIfExists(userData, auth0Id) {
+async function updateUser(userData, auth0Id, isAdmin = false) {
+  const userId = await tryGetUserId(auth0Id);
+  if (!userId)
+    return createUser(userData, auth0Id, isAdmin);
   const updateFields = {
     Avatar: userData.picture,
     FirstName: userData.given_name,
@@ -25,18 +61,7 @@ async function updateUserIfExists(userData, auth0Id) {
     .where({ Auth0Id: auth0Id })
     .update(updateFields)
     .returning('*');
-  return updated || null;
-}
-
-/**
- * Verifies a user exists in the DB. Return the DB user Id if found, null otherwise.
- * @param {string} auth0Id
- * @returns {Promise<number>} The DB user Id
- */
-async function tryGetUserId(auth0Id) {
-  if (!auth0Id) return null;
-  const [row] = await db('Users').where({ Auth0Id: auth0Id }).first();
-  return row ? row.Id : null;
+  return updated.Id;
 }
 
 /**
@@ -49,18 +74,7 @@ async function tryGetUserId(auth0Id) {
 async function getOrCreateUser(userData, auth0Id, isAdmin = false) {
   // Try to find the user
   const userId = await tryGetUserId(auth0Id);
-  if (userId) return userId;
-  // Insert new user
-  const insertFields = {
-    Avatar: userData.picture,
-    FirstName: userData.given_name,
-    LastName: userData.family_name,
-    Email: userData.email,
-    Auth0Id: auth0Id,
-    IsAdmin: !!isAdmin,
-  };
-  const [row] = await db('Users').insert(insertFields).returning('*');
-  return row.Id;
+  return userId ? userId : createUser(userData, auth0Id, isAdmin);
 }
 
 /**
@@ -274,7 +288,7 @@ function truncateContent(text) {
 }
 
 module.exports = {
-  updateUserIfExists,
+  updateUser,
   createPost,
   updatePost,
   getOrCreateUser,
