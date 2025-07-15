@@ -4,6 +4,7 @@ import Header from './components/Header';
 import Profile from './components/Profile';
 import Settings from './components/Settings';
 import AdminDashboard from './components/AdminDashboard';
+import ContentManagement from './components/ContentManagement';
 import { CssBaseline, Box, Typography, Button } from '@mui/material';
 import { useAuth0 } from '@auth0/auth0-react';
 import { isUserAdmin } from './components/Profile';
@@ -25,6 +26,13 @@ function Admin() {
   if (isLoading) return <Box mt={6} textAlign="center"><Typography>Loading...</Typography></Box>;
   if (!isUserAdmin(user)) return <Navigate to="/" replace />;
   return <AdminDashboard />;
+}
+
+function AdminContent() {
+  const { isLoading, user } = useAuth0();
+  if (isLoading) return <Box mt={6} textAlign="center"><Typography>Loading...</Typography></Box>;
+  if (!isUserAdmin(user)) return <Navigate to="/" replace />;
+  return <ContentManagement />;
 }
 
 function Landing() {
@@ -60,6 +68,7 @@ function App() {
       <Routes>
         <Route path="/feed" element={<PostFeed />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/admin/content" element={<AdminContent />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/" element={<Landing />} />
         <Route path="/settings/*" element={<Settings />} />

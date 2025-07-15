@@ -143,14 +143,14 @@ async function getPostList(userId = null, limit = 50, offset = 0) {
       'p.IsPremium as isPremium',
       // User's reaction (if userId provided)
       userId ? 
-        db.raw(`(SELECT upr.Reaction FROM UserPostReaction upr WHERE upr.PostId = p.Id AND upr.UserId = ?) as reaction`, [userId]) :
+        db.raw(`(SELECT upr."Reaction" FROM "UserPostReaction" upr WHERE upr."PostId" = p."Id" AND upr."UserId" = ?) as reaction`, [userId]) :
         db.raw('NULL as reaction'),
       // Count of likes (reaction = 1)
-      db.raw(`(SELECT COUNT(*) FROM UserPostReaction upr WHERE upr.PostId = p.Id AND upr.Reaction = 1) as numberOfLikes`),
+      db.raw(`(SELECT COUNT(*) FROM "UserPostReaction" upr WHERE upr."PostId" = p."Id" AND upr."Reaction" = 1) as numberOfLikes`),
       // Count of dislikes (reaction = -1)
-      db.raw(`(SELECT COUNT(*) FROM UserPostReaction upr WHERE upr.PostId = p.Id AND upr.Reaction = -1) as numberOfDislikes`),
+      db.raw(`(SELECT COUNT(*) FROM "UserPostReaction" upr WHERE upr."PostId" = p."Id" AND upr."Reaction" = -1) as numberOfDislikes`),
       // Count of comments
-      db.raw(`(SELECT COUNT(*) FROM PostComments pc WHERE pc.PostId = p.Id) as numberOfComments`)
+      db.raw(`(SELECT COUNT(*) FROM "PostComments" pc WHERE pc."PostId" = p."Id") as numberOfComments`)
     ])
     .orderBy('p.CreatedOn', 'desc')
     .limit(limit)

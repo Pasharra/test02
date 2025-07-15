@@ -3,6 +3,7 @@ import { AppBar, Toolbar, IconButton, Avatar, Menu, MenuItem, Box, Tooltip, Divi
 import { useAuth0 } from '@auth0/auth0-react';
 import { useNavigate } from 'react-router-dom';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import { isUserAdmin } from './Profile';
 
 const stringToColor = (string) => {
   let hash = 0, i, color = '#';
@@ -49,6 +50,16 @@ const Header = () => {
     navigate('/settings/security');
   };
 
+  const handleDashboard = () => {
+    handleClose();
+    navigate('/admin');
+  };
+
+  const handleContent = () => {
+    handleClose();
+    navigate('/admin/content');
+  };
+
   const handleLogout = async () => {
     handleClose();
     setLogoutError('');
@@ -82,6 +93,11 @@ const Header = () => {
             anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
           >
+            {isUserAdmin(user) && [
+              <MenuItem key="dashboard" onClick={handleDashboard}>Dashboard</MenuItem>,
+              <MenuItem key="content" onClick={handleContent}>Content</MenuItem>,
+              <Divider key="admin-divider" />
+            ]}
             <MenuItem onClick={handleProfile}>Profile</MenuItem>
             <MenuItem onClick={handleSettings}>Settings</MenuItem>
             <Divider />
