@@ -25,10 +25,37 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
   console.log('AUTH0_DOMAIN: ' + config.AUTH0_DOMAIN);
   console.log('S3_AVATAR_BUCKET: ' + config.S3_AVATAR_BUCKET);
-  res.json({ status: 'ok', message: 'AI Content Web App backend is running.' });
+  
+  // Test database connection
+  const db = require('./src/db');
+  let dbStatus = 'disconnected';
+  let dbError = null;
+  
+  try {
+    // Test basic connection
+    await db.raw('SELECT 1 as test');
+    dbStatus = 'connected';
+    console.log('✅ Database connection healthy');
+  } catch (error) {
+    console.error('❌ Database connection failed:', error.message);
+    dbStatus = 'error';
+    dbError = {
+      message: error.message,
+      code: error.code
+    };
+  }
+  
+  res.json({ 
+    status: 'ok', 
+    message: 'AI Content Web App backend is running.',
+    database: {
+      status: dbStatus,
+      error: dbError
+    }
+  });
 });
 
 app.use('/api/profile', profileRoute);

@@ -325,6 +325,9 @@ async function getMetrics() {
       totalActiveSubscriptions: activeSubscriptions,
       top5MostLikedPosts: top5MostLikedPosts,
       top5MostCommentedPosts: top5MostCommentedPosts,
+      // TODO: Remove this once we have a real data source
+      userSignups: [10, 8, 3, 11, 15, 6, 7],
+      publishedPosts: [3, 2, 5, 1, 7, 4, 4],
     });
   } catch (error) {
     console.error('Error getting metrics:', error);

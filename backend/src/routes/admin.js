@@ -157,11 +157,7 @@ router.get('/metrics', async (req, res) => {
   try {
     // Get comprehensive metrics data
     const metrics = await getMetrics();
-    
-    res.json({
-      success: true,
-      metrics
-    });
+    res.json(metrics);
   } catch (err) {
     console.error('GET /api/admin/metrics error:', err.message);
     res.status(500).json({ error: 'Failed to fetch metrics.' });
