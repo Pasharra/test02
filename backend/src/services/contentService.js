@@ -294,6 +294,7 @@ function truncateContent(text) {
  * @returns {Promise<MetricsData>} MetricsData object
  */
 async function getMetrics() {
+  // TODO: cache this in memory
   try {
     // Call stored procedures and get active subscriptions in parallel
     const [dbResult, activeSubscriptions, mostLikedResult, mostCommentedResult] = await Promise.all([

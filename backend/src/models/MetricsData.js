@@ -9,6 +9,9 @@ class MetricsData {
     totalActiveSubscriptions = 0,
     top5MostLikedPosts = [],
     top5MostCommentedPosts = [],
+    // TODO: Remove this once we have a real data source
+    userSignups = [10, 8, 3, 11, 15, 6, 7],
+    publishedPosts = [3, 2, 5, 1, 7, 4, 4],
   } = {}) {
     this.totalUsers = totalUsers;
     this.newUsersInLast7Days = newUsersInLast7Days;
@@ -19,6 +22,8 @@ class MetricsData {
     this.totalActiveSubscriptions = totalActiveSubscriptions;
     this.top5MostLikedPosts = top5MostLikedPosts;
     this.top5MostCommentedPosts = top5MostCommentedPosts;
+    this.userSignups = userSignups;
+    this.publishedPosts = publishedPosts;
   }
 }
 

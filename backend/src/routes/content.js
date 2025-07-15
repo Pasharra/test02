@@ -1,9 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { checkJwt, checkAdmin, isUserAdmin } = require('../utils/authHelper');
-const { getPostList, getPostById, tryGetUserId, createPost, updatePost, truncateContent } = require('../services/contentService');
+const { getPostList, getPostById, tryGetUserId, truncateContent } = require('../services/contentService');
 const { getSubscriptionStatus } = require('../services/subscriptionService');
-const PostData = require('../models/PostData');
 
 /**
  * Validate PostData request body
@@ -171,85 +170,6 @@ router.get('/posts/:id', async (req, res) => {
   } catch (err) {
     console.error('GET /api/content/posts/:id error:', err.message);
     res.status(500).json({ error: 'Failed to fetch post.' });
-  }
-});
-
-// POST /api/content/posts
-// Body: { title, content, image, readingTime, isPremium }
-router.post('/posts', checkJwt, checkAdmin, async (req, res) => {
-  try {
-    // Validate request data
-    const validation = validatePostData(req.body, false);
-    if (!validation.isValid) {
-      return res.status(400).json({ error: validation.errors.join(' ') });
-    }
-    
-    // Create PostData instance
-    const postData = new PostData(validation.validatedData);
-    
-    // Create the post
-    await createPost(postData);
-    
-    res.status(201).json({
-      success: true,
-      message: 'Post created successfully.',
-      post: {
-        title: postData.title,
-        isPremium: postData.isPremium,
-        readingTime: postData.readingTime,
-      }
-    });
-  } catch (err) {
-    console.error('POST /api/content/posts error:', err.message);
-    res.status(500).json({ error: 'Failed to create post.' });
-  }
-});
-
-// PUT /api/content/posts/:id
-// Body: { title, content, image, readingTime, isPremium } (all optional)
-router.put('/posts/:id', checkJwt, checkAdmin, async (req, res) => {
-  try {
-    const postId = parseInt(req.params.id);
-    
-    // Validate post ID
-    if (isNaN(postId) || postId <= 0) {
-      return res.status(400).json({ error: 'Invalid post ID.' });
-    }
-    
-    // Validate request data (allow partial updates)
-    const validation = validatePostData(req.body, true);
-    if (!validation.isValid) {
-      return res.status(400).json({ error: validation.errors.join(' ') });
-    }
-    
-    // Check if there's at least one field to update
-    if (Object.keys(validation.validatedData).length === 0) {
-      return res.status(400).json({ error: 'At least one field must be provided for update.' });
-    }
-    
-    // Create PostData instance with ID
-    const postData = new PostData({
-      id: postId,
-      ...validation.validatedData
-    });
-    
-    // Update the post
-    await updatePost(postData);
-    
-    res.json({
-      success: true,
-      message: 'Post updated successfully.',
-      post: {
-        id: postData.id,
-        ...validation.validatedData
-      }
-    });
-  } catch (err) {
-    console.error('PUT /api/content/posts/:id error:', err.message);
-    if (err.message.includes('Post id is required')) {
-      return res.status(400).json({ error: 'Invalid post data.' });
-    }
-    res.status(500).json({ error: 'Failed to update post.' });
   }
 });
 
