@@ -7,7 +7,7 @@ const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const path = require('path');
 const { sendVerificationCode } = require('../services/notificationService');
 const UserData = require('../models/UserData');
-const { updateUserIfExists } = require('../services/contentService');
+const { updateUser } = require('../services/contentService');
 
 const s3 = new S3Client({
   region: process.env.AWS_REGION,
@@ -84,7 +84,7 @@ router.post('/resend-verification', checkJwt, async (req, res) => {
   }
 });
 
-// POST /api/avatar/upload
+// POST /api/profile/avatar/upload
 router.post('/avatar/upload', checkJwt, upload.single('avatar'), async (req, res) => {
   //console.log('starting api/avatar/upload');
   if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });

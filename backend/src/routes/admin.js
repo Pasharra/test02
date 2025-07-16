@@ -3,9 +3,68 @@ const router = express.Router();
 const { checkJwt, checkAdmin } = require('../utils/authHelper');
 const { createPost, updatePost, getMetrics } = require('../services/contentService');
 const PostData = require('../models/PostData');
+const multer = require('multer');
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const path = require('path');
+const crypto = require('crypto');
+const config = require('../utils/config');
+
+// Configure S3 client
+const s3 = new S3Client({
+  region: config.AWS_REGION,
+  credentials: {
+    accessKeyId: config.AWS_ACCESS_KEY_ID,
+    secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
+  },
+});
+
+// Configure multer for file upload (2MB limit)
+const upload = multer({ limits: { fileSize: 2 * 1024 * 1024 } });
 
 // All admin routes require authentication and admin role
 router.use(checkJwt, checkAdmin);
+
+// POST /api/admin/image/upload
+router.post('/image/upload', upload.single('image'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded.' });
+  }
+
+  // Validate file type
+  const ext = path.extname(req.file.originalname).toLowerCase();
+  if (!['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) {
+    return res.status(400).json({ error: 'Invalid file type. Only JPG, PNG, and WEBP are allowed.' });
+  }
+
+  // Generate unique filename using timestamp and random string
+  const timestamp = Date.now();
+  const randomString = crypto.randomBytes(8).toString('hex');
+  const filename = `post-${timestamp}-${randomString}${ext}`;
+
+  // Use same S3 bucket as avatars (or add separate config for post images)
+  const bucket = config.S3_AVATAR_BUCKET;
+  const prefix = config.S3_POST_IMAGES_PREFIX || 'post-images';
+  const key = `${prefix}/${filename}`;
+
+  try {
+    // Upload to S3
+    await s3.send(new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: req.file.buffer,
+      ContentType: req.file.mimetype,
+    }));
+
+    // Construct the public URL
+    const baseurl = config.AWS_CLOUDFRONT_URI;
+    const url = `${baseurl}/${key}`;
+
+    res.json({ url });
+  } catch (err) {
+    console.error('S3 upload error:', err);
+    res.status(500).json({ error: 'Failed to upload image.' });
+  }
+});
 
 /**
  * Validate PostData request body
