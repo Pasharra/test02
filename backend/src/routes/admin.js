@@ -9,6 +9,7 @@ const path = require('path');
 const crypto = require('crypto');
 const config = require('../utils/config');
 const { getPostStatusDBValue, isValidPostStatus, getValidPostStatuses } = require('../utils/postStatusHelper');
+const { isValidPostSort, getValidPostSorts, DEFAULT_POST_SORT } = require('../utils/postSortHelper');
 
 // Configure S3 client
 const s3 = new S3Client({
@@ -158,12 +159,13 @@ function validatePostData(body) {
 }
 
 // GET /api/admin/posts
-// Query params: limit, offset (both optional)
+// Query params: limit, offset, sort (all optional)
 router.get('/posts', async (req, res) => {
   try {
     // Parse query parameters
     const limit = req.query.limit ? parseInt(req.query.limit) : 50;
     const offset = req.query.offset ? parseInt(req.query.offset) : 0;
+    const sort = req.query.sort || DEFAULT_POST_SORT;
     
     // Validate query parameters
     if (isNaN(limit) || limit < 1 || limit > 100) {
@@ -172,9 +174,14 @@ router.get('/posts', async (req, res) => {
     if (isNaN(offset) || offset < 0) {
       return res.status(400).json({ error: 'Invalid offset parameter. Must be 0 or greater.' });
     }
+    if (!isValidPostSort(sort)) {
+      return res.status(400).json({ 
+        error: `Invalid sort parameter. Must be one of: ${getValidPostSorts().join(', ')}.` 
+      });
+    }
 
     // Get posts list using admin service
-    const posts = await getPostList(limit, offset);
+    const posts = await getPostList(limit, offset, sort);
     
     res.json({
       success: true,
@@ -182,6 +189,7 @@ router.get('/posts', async (req, res) => {
       pagination: {
         limit,
         offset,
+        sort,
         count: posts.length
       }
     });

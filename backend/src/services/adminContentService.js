@@ -7,14 +7,16 @@ const PostListData = require('../models/PostListData');
 const MetricsData = require('../models/MetricsData');
 const { getPostStatusName, getPostStatusDBValue } = require('../utils/postStatusHelper');
 const { getNumberOfActiveSubscriptions } = require('./subscriptionService');
+const { getPostSortColumn, DEFAULT_POST_SORT } = require('../utils/postSortHelper');
 
 /**
  * Get a list of posts with aggregated data for admin management.
  * @param {number} limit - Optional limit for pagination (default: 50)
  * @param {number} offset - Optional offset for pagination (default: 0)
+ * @param {string} sort - Optional sort parameter (default: 'date')
  * @returns {Promise<AdminPostListData[]>} Array of AdminPostListData objects
  */
-async function getPostList(limit = 50, offset = 0) {
+async function getPostList(limit = 50, offset = 0, sort = DEFAULT_POST_SORT) {
   // Build the main query using counter fields from Posts table
   const query = db('Posts as p')
     .select([
@@ -25,11 +27,12 @@ async function getPostList(limit = 50, offset = 0) {
       'p.Status as status',
       'p.Likes as numberOfLikes',
       'p.Dislikes as numberOfDislikes',
-      'p.Comments as numberOfComments'
-    ])
-    .orderBy('p.CreatedOn', 'desc')
-    .limit(limit)
-    .offset(offset);
+      'p.Comments as numberOfComments',
+      'p.Views as numberOfViews'
+          ])
+      .orderBy(`p.${getPostSortColumn(sort)}`, 'desc')
+      .limit(limit)
+      .offset(offset);
 
   const posts = await query;
 
@@ -63,6 +66,7 @@ async function getPostList(limit = 50, offset = 0) {
     numberOfLikes: post.numberOfLikes || 0,
     numberOfDislikes: post.numberOfDislikes || 0,
     numberOfComments: post.numberOfComments || 0,
+    numberOfViews: post.numberOfViews || 0,
     labels: labelsMap[post.id] || []
   }));
 }
@@ -137,7 +141,8 @@ async function createPost(postData) {
       Status: postData.status !== undefined ? postData.status : 0, // Default to DRAFT (0)
       Likes: 0,
       Dislikes: 0,
-      Comments: 0
+      Comments: 0,
+      Views: 0
     };
     
     const [post] = await trx('Posts').insert(insertFields).returning('*');
