@@ -64,7 +64,7 @@ const PostsTable = () => {
       const offset = pageNum * POSTS_PER_PAGE;
       
       const response = await fetch(
-        `${BACKEND_URI}/api/content/posts?limit=${POSTS_PER_PAGE}&offset=${offset}`,
+        `${BACKEND_URI}/api/admin/posts?limit=${POSTS_PER_PAGE}&offset=${offset}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

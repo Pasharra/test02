@@ -2,12 +2,10 @@
 
 const db = require('../db');
 const UserData = require('../models/UserData');
-const PostData = require('../models/PostData');
 const PostListData = require('../models/PostListData');
 const PostDetailData = require('../models/PostDetailData');
 const CommentData = require('../models/CommentData');
-const MetricsData = require('../models/MetricsData');
-const { getNumberOfActiveSubscriptions } = require('./subscriptionService');
+
 const { getPostStatusName, getPostStatusDBValue } = require('../utils/postStatusHelper');
 
 /**
@@ -80,134 +78,7 @@ async function getOrCreateUser(userData, auth0Id, isAdmin = false) {
   return userId ? userId : createUser(userData, auth0Id, isAdmin);
 }
 
-/**
- * Create a new post in the Posts table.
- * @param {PostData} postData
- */
-async function createPost(postData) {
-  const trx = await db.transaction();
-  
-  try {
-    // Insert the post
-    const insertFields = {
-      Image: postData.image,
-      Title: postData.title,
-      Content: postData.content,
-      Preview: truncateContent(postData.content),
-      ReadingTime: postData.readingTime,
-      CreatedOn: db.fn.now(),
-      UpdatedOn: db.fn.now(),
-      IsPremium: postData.isPremium,
-      Status: postData.status !== undefined ? postData.status : 0, // Default to DRAFT (0)
-    };
-    
-    const [post] = await trx('Posts').insert(insertFields).returning('*');
-    const postId = post.Id;
-    
-    // Handle labels if provided
-    if (postData.labels && postData.labels.length > 0) {
-      await addPostLabels(trx, postId, postData.labels);
-    }
-    
-    await trx.commit();
-    return post;
-  } catch (error) {
-    await trx.rollback();
-    throw error;
-  }
-}
 
-/**
- * Add labels to a post - create labels if they don't exist and associate them with the post
- * @param {import('knex').Knex.Transaction} trx - Database transaction
- * @param {number} postId - Post ID
- * @param {string[]} labels - Array of label names
- */
-async function addPostLabels(trx, postId, labels) {
-  for (const labelName of labels) {
-    const trimmedLabel = labelName.trim();
-    if (!trimmedLabel) continue;
-    
-    // Try to find existing label
-    let label = await trx('Labels').where('Caption', trimmedLabel).first();
-    
-    // Create label if it doesn't exist
-    if (!label) {
-      [label] = await trx('Labels').insert({ Caption: trimmedLabel }).returning('*');
-    }
-    
-    // Associate label with post (ignore if already exists)
-    await trx('PostLabels')
-      .insert({ PostId: postId, LabelId: label.Id })
-      .onConflict(['PostId', 'LabelId'])
-      .ignore();
-  }
-}
-
-/**
- * Update an existing post in the Posts table by id.
- * @param {PostData} postData
- */
-async function updatePost(postData) {
-  if (!postData.id) throw new Error('Post id is required for update');
-  
-  const trx = await db.transaction();
-  
-  try {
-    // Update all fields as all fields are passed from frontend/admin route
-    const updateFields = {
-      Image: postData.image,
-      Title: postData.title,
-      Content: postData.content,
-      Preview: truncateContent(postData.content),
-      ReadingTime: postData.readingTime,
-      IsPremium: postData.isPremium,
-      Status: getPostStatusDBValue(postData.status),
-      UpdatedOn: db.fn.now()
-    };
-    
-    // Update the post
-    await trx('Posts')
-      .where({ Id: postData.id })
-      .update(updateFields);
-    
-    // Handle labels update with comparison logic
-    // Load existing post labels from DB
-    const existingLabelsQuery = await trx('PostLabels as pl')
-      .join('Labels as l', 'pl.LabelId', 'l.Id')
-      .select('l.Caption', 'pl.LabelId')
-      .where('pl.PostId', postData.id);
-    
-    const existingLabels = existingLabelsQuery.map(row => row.Caption);
-    const newLabels = postData.labels || [];
-    
-    // Compare to find labels to add and delete
-    const labelsToAdd = newLabels.filter(label => !existingLabels.includes(label));
-    const labelsToDelete = existingLabels.filter(label => !newLabels.includes(label));
-    
-    // Delete labels that must be deleted
-    if (labelsToDelete.length > 0) {
-      const labelIdsToDelete = existingLabelsQuery
-        .filter(row => labelsToDelete.includes(row.Caption))
-        .map(row => row.LabelId);
-      
-      await trx('PostLabels')
-        .where('PostId', postData.id)
-        .whereIn('LabelId', labelIdsToDelete)
-        .del();
-    }
-    
-    // Add labels that must be added
-    if (labelsToAdd.length > 0) {
-      await addPostLabels(trx, postData.id, labelsToAdd);
-    }
-    
-    await trx.commit();
-  } catch (error) {
-    await trx.rollback();
-    throw error;
-  }
-}
 
 /**
  * Get a list of posts with aggregated data for the post feed.
@@ -352,89 +223,10 @@ async function getPostById(postId, userId = null) {
   });
 }
 
-/**
- * Truncate text to maximum of 500 characters, ending at word boundary
- * @param {string} text - The text to truncate
- * @returns {string} Truncated text with "..." appended if truncated
- */
-function truncateContent(text) {
-  if (!text || typeof text !== 'string') {
-    return '';
-  }
-  
-  // If text is already 500 characters or less, return as is
-  if (text.length <= 500) {
-    return text;
-  }
-  
-  // Find the last space within the first 500 characters
-  const truncated = text.substring(0, 500);
-  const lastSpaceIndex = truncated.lastIndexOf(' ');
-  
-  // If no space found, just truncate at 500 characters
-  if (lastSpaceIndex === -1) {
-    return truncated + '...';
-  }
-  
-  // Truncate at the last word boundary and append "..."
-  return truncated.substring(0, lastSpaceIndex) + '...';
-}
-
-/**
- * Get metrics data for the dashboard.
- * @returns {Promise<MetricsData>} MetricsData object
- */
-async function getMetrics() {
-  // TODO: cache this in memory
-  try {
-    // Call stored procedures and get active subscriptions in parallel
-    const [dbResult, activeSubscriptions, mostLikedResult, mostCommentedResult] = await Promise.all([
-      db.raw('SELECT * FROM get_dashboard_metrics()'),
-      getNumberOfActiveSubscriptions(),
-      db.raw('SELECT * FROM get_most_liked_posts(5)'),
-      db.raw('SELECT * FROM get_most_commented_posts(5)')
-    ]);
-    
-    const metrics = dbResult.rows[0];
-    const top5MostLikedPosts = mostLikedResult.rows.map(row => new PostListData({
-      title: row.title,
-      numberOfLikes: parseInt(row.number_of_likes) || 0
-    }));
-    const top5MostCommentedPosts = mostCommentedResult.rows.map(row => new PostListData({
-      title: row.title,
-      numberOfComments: parseInt(row.number_of_comments) || 0
-    }));
-    
-    // Create MetricsData object with the stored procedure results and subscription count
-    return new MetricsData({
-      totalUsers: parseInt(metrics.total_users) || 0,
-      newUsersInLast7Days: parseInt(metrics.new_users_in_last_7_days) || 0,
-      newUsersInLast30Days: parseInt(metrics.new_users_in_last_30_days) || 0,
-      totalPublishedPosts: parseInt(metrics.total_published_posts) || 0,
-      newPublishedPostsInLast7Days: parseInt(metrics.new_published_posts_in_last_7_days) || 0,
-      newPublishedPostsInLast30Days: parseInt(metrics.new_published_posts_in_last_30_days) || 0,
-      totalActiveSubscriptions: activeSubscriptions,
-      top5MostLikedPosts: top5MostLikedPosts,
-      top5MostCommentedPosts: top5MostCommentedPosts,
-      // TODO: Remove this once we have a real data source
-      userSignups: [10, 8, 3, 11, 15, 6, 7],
-      publishedPosts: [3, 2, 5, 1, 7, 4, 4],
-    });
-  } catch (error) {
-    console.error('Error getting metrics:', error);
-    // Return empty MetricsData object on error
-    return new MetricsData();
-  }
-}
-
 module.exports = {
   updateUser,
-  createPost,
-  updatePost,
   getOrCreateUser,
   getPostList,
   getPostById,
   tryGetUserId,
-  truncateContent,
-  getMetrics,
 }; 

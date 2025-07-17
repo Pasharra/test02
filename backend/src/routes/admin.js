@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { checkJwt, checkAdmin } = require('../utils/authHelper');
-const { createPost, updatePost, getMetrics } = require('../services/contentService');
+const { getPostList, getPostById, createPost, updatePost, getMetrics } = require('../services/adminContentService');
 const PostData = require('../models/PostData');
 const multer = require('multer');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
@@ -70,10 +70,9 @@ router.post('/image/upload', upload.single('image'), async (req, res) => {
 /**
  * Validate PostData request body
  * @param {object} body - Request body
- * @param {boolean} isUpdate - Whether this is an update operation (allows partial data)
  * @returns {object} { isValid, errors, validatedData }
  */
-function validatePostData(body, isUpdate = false) {
+function validatePostData(body) {
   const { title, content, image, readingTime, isPremium, labels, status } = body;
   const errors = [];
   
@@ -159,6 +158,67 @@ function validatePostData(body, isUpdate = false) {
   
   return { isValid: true, errors: [], validatedData };
 }
+
+// GET /api/admin/posts
+// Query params: limit, offset (both optional)
+router.get('/posts', async (req, res) => {
+  try {
+    // Parse query parameters
+    const limit = req.query.limit ? parseInt(req.query.limit) : 50;
+    const offset = req.query.offset ? parseInt(req.query.offset) : 0;
+    
+    // Validate query parameters
+    if (isNaN(limit) || limit < 1 || limit > 100) {
+      return res.status(400).json({ error: 'Invalid limit parameter. Must be between 1 and 100.' });
+    }
+    if (isNaN(offset) || offset < 0) {
+      return res.status(400).json({ error: 'Invalid offset parameter. Must be 0 or greater.' });
+    }
+
+    // Get posts list using admin service
+    const posts = await getPostList(limit, offset);
+    
+    res.json({
+      success: true,
+      posts,
+      pagination: {
+        limit,
+        offset,
+        count: posts.length
+      }
+    });
+  } catch (err) {
+    console.error('GET /api/admin/posts error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch posts.' });
+  }
+});
+
+// GET /api/admin/posts/:id
+router.get('/posts/:id', async (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    
+    // Validate post ID
+    if (isNaN(postId) || postId <= 0) {
+      return res.status(400).json({ error: 'Invalid post ID.' });
+    }
+
+    // Get the post by ID using admin service
+    const post = await getPostById(postId);
+    
+    if (!post) {
+      return res.status(404).json({ error: 'Post not found.' });
+    }
+    
+    res.json({
+      success: true,
+      post
+    });
+  } catch (err) {
+    console.error('GET /api/admin/posts/:id error:', err.message);
+    res.status(500).json({ error: 'Failed to fetch post.' });
+  }
+});
 
 // POST /api/admin/posts
 // Body: { title, content, image, readingTime, isPremium }

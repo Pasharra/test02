@@ -1,76 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { checkJwt, checkAdmin, isUserAdmin } = require('../utils/authHelper');
-const { getPostList, getPostById, tryGetUserId, truncateContent } = require('../services/contentService');
+const { isUserAdmin } = require('../utils/authHelper');
+const { getPostList, getPostById, tryGetUserId } = require('../services/contentService');
 const { getSubscriptionStatus } = require('../services/subscriptionService');
-
-/**
- * Validate PostData request body
- * @param {object} body - Request body
- * @param {boolean} isUpdate - Whether this is an update operation (allows partial data)
- * @returns {object} { isValid, errors, validatedData }
- */
-function validatePostData(body, isUpdate = false) {
-  const { title, content, image, readingTime, isPremium } = body;
-  const errors = [];
-  
-  // Required fields validation (only for create, not update)
-  if (!isUpdate) {
-    if (!title || !content) {
-      errors.push('Missing required fields: title, content.');
-      return { isValid: false, errors };
-    }
-  }
-  
-  // Validate title if provided
-  if (title !== undefined) {
-    if (typeof title !== 'string' || title.trim().length === 0) {
-      errors.push('Title must be a non-empty string.');
-    } else if (title.length > 500) {
-      errors.push('Title must be 500 characters or less.');
-    }
-  }
-  
-  // Validate content if provided
-  if (content !== undefined) {
-    if (typeof content !== 'string' || content.trim().length === 0) {
-      errors.push('Content must be a non-empty string.');
-    }
-  }
-  
-
-  
-  // Validate image if provided
-  if (image !== undefined && typeof image !== 'string') {
-    errors.push('Image must be a string.');
-  }
-  
-  // Validate reading time if provided
-  if (readingTime !== undefined && readingTime !== null) {
-    if (isNaN(readingTime) || readingTime < 0) {
-      errors.push('Reading time must be a positive number.');
-    }
-  }
-  
-  // Validate isPremium if provided
-  if (isPremium !== undefined && typeof isPremium !== 'boolean') {
-    errors.push('isPremium must be a boolean value.');
-  }
-  
-  if (errors.length > 0) {
-    return { isValid: false, errors };
-  }
-  
-  // Return validated data with proper defaults and sanitization
-  const validatedData = {};
-  if (title !== undefined) validatedData.title = title.trim();
-  if (content !== undefined) validatedData.content = content;
-  if (image !== undefined) validatedData.image = image || '';
-  if (readingTime !== undefined) validatedData.readingTime = readingTime || null;
-  if (isPremium !== undefined) validatedData.isPremium = isPremium || false;
-  
-  return { isValid: true, errors: [], validatedData };
-}
 
 // GET /api/content/posts
 // Query params: limit, offset (both optional)
@@ -91,7 +23,7 @@ router.get('/posts', async (req, res) => {
     // Try to get auth0 user id from auth token (optional)
     const auth0Id = req.auth && req.auth.sub;
     // Try to resolve DB user id by auth0 id
-     const userId = await tryGetUserId(auth0Id);
+    const userId = await tryGetUserId(auth0Id);
 
     // Get posts list
     const posts = await getPostList(userId, limit, offset);
@@ -172,9 +104,5 @@ router.get('/posts/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch post.' });
   }
 });
-
-// TODO: Add other content-related routes here
-// Examples:
-// DELETE /api/content/posts/:id - Delete post (admin only)
 
 module.exports = router; 
