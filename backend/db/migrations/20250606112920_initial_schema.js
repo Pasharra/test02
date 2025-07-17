@@ -24,6 +24,7 @@ exports.up = async function(knex) {
     table.timestamp('CreatedOn').notNullable().defaultTo(knex.fn.now());
     table.timestamp('UpdatedOn').notNullable().defaultTo(knex.fn.now());
     table.boolean('IsPremium').nullable();
+    table.integer('Status').notNullable().defaultTo(0);
   });
 
   await knex.schema.createTable('Labels', table => {

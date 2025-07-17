@@ -8,6 +8,7 @@ const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const path = require('path');
 const crypto = require('crypto');
 const config = require('../utils/config');
+const { getPostStatusDBValue, isValidPostStatus, getValidPostStatuses } = require('../utils/postStatusHelper');
 
 // Configure S3 client
 const s3 = new S3Client({
@@ -58,7 +59,7 @@ router.post('/image/upload', upload.single('image'), async (req, res) => {
     // Construct the public URL
     const baseurl = config.AWS_CLOUDFRONT_URI;
     const url = `${baseurl}/${key}`;
-
+    console.log('S3 upload success:', url);
     res.json({ url });
   } catch (err) {
     console.error('S3 upload error:', err);
@@ -73,61 +74,88 @@ router.post('/image/upload', upload.single('image'), async (req, res) => {
  * @returns {object} { isValid, errors, validatedData }
  */
 function validatePostData(body, isUpdate = false) {
-  const { title, content, image, readingTime, isPremium } = body;
+  const { title, content, image, readingTime, isPremium, labels, status } = body;
   const errors = [];
   
-  // Required fields validation (only for create, not update)
-  if (!isUpdate) {
-    if (!title || !content) {
-      errors.push('Missing required fields: title, content.');
-      return { isValid: false, errors };
-    }
+  // Required fields validation (always required since frontend sends all fields)
+  if (!title || !content) {
+    errors.push('Missing required fields: title, content.');
+    return { isValid: false, errors };
   }
   
-  // Validate title if provided
-  if (title !== undefined) {
-    if (typeof title !== 'string' || title.trim().length === 0) {
-      errors.push('Title must be a non-empty string.');
-    } else if (title.length > 500) {
-      errors.push('Title must be 500 characters or less.');
-    }
+  // Validate title (always required)
+  if (typeof title !== 'string' || title.trim().length === 0) {
+    errors.push('Title must be a non-empty string.');
+  } else if (title.length > 500) {
+    errors.push('Title must be 500 characters or less.');
   }
   
-  // Validate content if provided
-  if (content !== undefined) {
-    if (typeof content !== 'string' || content.trim().length === 0) {
-      errors.push('Content must be a non-empty string.');
-    }
+  // Validate content (always required)
+  if (typeof content !== 'string' || content.trim().length === 0) {
+    errors.push('Content must be a non-empty string.');
   }
   
-  // Validate image if provided
+  // Validate image (optional but must be string if provided)
   if (image !== undefined && typeof image !== 'string') {
     errors.push('Image must be a string.');
   }
   
-  // Validate reading time if provided
+  // Validate reading time (optional but must be positive number if provided)
   if (readingTime !== undefined && readingTime !== null) {
     if (isNaN(readingTime) || readingTime < 0) {
       errors.push('Reading time must be a positive number.');
     }
   }
   
-  // Validate isPremium if provided
-  if (isPremium !== undefined && typeof isPremium !== 'boolean') {
+  // Validate isPremium (always required)
+  if (isPremium === undefined || typeof isPremium !== 'boolean') {
     errors.push('isPremium must be a boolean value.');
   }
-  
+
+  // Validate labels (always required)
+  if (!labels || !Array.isArray(labels)) {
+    errors.push('Labels must be an array.');
+  } else if (labels.length === 0) {
+    errors.push('At least one label is required.');
+  } else {
+    // Check if all labels are strings
+    for (const label of labels) {
+      if (typeof label !== 'string') {
+        errors.push('All labels must be strings.');
+        break;
+      }
+    }
+    
+    // Check if there's at least one non-empty label after trimming
+    const nonEmptyLabels = labels.filter(label => typeof label === 'string' && label.trim().length > 0);
+    if (nonEmptyLabels.length === 0) {
+      errors.push('At least one label must contain non-whitespace characters.');
+    }
+  }
+
+  // Validate status (always required)
+  if (!status || !isValidPostStatus(status)) {
+    errors.push(`Status must be one of: ${getValidPostStatuses().join(', ')}.`);
+  }
+
   if (errors.length > 0) {
     return { isValid: false, errors };
   }
   
   // Return validated data with proper defaults and sanitization
   const validatedData = {};
-  if (title !== undefined) validatedData.title = title.trim();
-  if (content !== undefined) validatedData.content = content;
-  if (image !== undefined) validatedData.image = image || '';
-  if (readingTime !== undefined) validatedData.readingTime = readingTime || null;
-  if (isPremium !== undefined) validatedData.isPremium = isPremium || false;
+  validatedData.title = title.trim();
+  validatedData.content = content;
+  validatedData.image = image || null;
+  validatedData.readingTime = readingTime || null;
+  validatedData.isPremium = isPremium || false;
+  
+  // Remove duplicates and empty strings, then trim
+  const trimmedLabels = labels.map(label => label.trim()).filter(label => label.length > 0);
+  const distinctLabels = [...new Set(trimmedLabels)];
+  validatedData.labels = distinctLabels;
+  
+  validatedData.status = getPostStatusDBValue(status);
   
   return { isValid: true, errors: [], validatedData };
 }

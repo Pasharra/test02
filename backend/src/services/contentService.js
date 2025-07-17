@@ -8,6 +8,7 @@ const PostDetailData = require('../models/PostDetailData');
 const CommentData = require('../models/CommentData');
 const MetricsData = require('../models/MetricsData');
 const { getNumberOfActiveSubscriptions } = require('./subscriptionService');
+const { getPostStatusName, getPostStatusDBValue } = require('../utils/postStatusHelper');
 
 /**
  * Verifies a user exists in the DB. Return the DB user Id if found, null otherwise.
@@ -84,17 +85,63 @@ async function getOrCreateUser(userData, auth0Id, isAdmin = false) {
  * @param {PostData} postData
  */
 async function createPost(postData) {
-  const insertFields = {
-    Image: postData.image,
-    Title: postData.title,
-    Content: postData.content,
-    Preview: truncateContent(postData.content),
-    ReadingTime: postData.readingTime,
-    CreatedOn: db.fn.now(),
-    UpdatedOn: db.fn.now(),
-    IsPremium: postData.isPremium,
-  };
-  await db('Posts').insert(insertFields);
+  const trx = await db.transaction();
+  
+  try {
+    // Insert the post
+    const insertFields = {
+      Image: postData.image,
+      Title: postData.title,
+      Content: postData.content,
+      Preview: truncateContent(postData.content),
+      ReadingTime: postData.readingTime,
+      CreatedOn: db.fn.now(),
+      UpdatedOn: db.fn.now(),
+      IsPremium: postData.isPremium,
+      Status: postData.status !== undefined ? postData.status : 0, // Default to DRAFT (0)
+    };
+    
+    const [post] = await trx('Posts').insert(insertFields).returning('*');
+    const postId = post.Id;
+    
+    // Handle labels if provided
+    if (postData.labels && postData.labels.length > 0) {
+      await addPostLabels(trx, postId, postData.labels);
+    }
+    
+    await trx.commit();
+    return post;
+  } catch (error) {
+    await trx.rollback();
+    throw error;
+  }
+}
+
+/**
+ * Add labels to a post - create labels if they don't exist and associate them with the post
+ * @param {import('knex').Knex.Transaction} trx - Database transaction
+ * @param {number} postId - Post ID
+ * @param {string[]} labels - Array of label names
+ */
+async function addPostLabels(trx, postId, labels) {
+  for (const labelName of labels) {
+    const trimmedLabel = labelName.trim();
+    if (!trimmedLabel) continue;
+    
+    // Try to find existing label
+    let label = await trx('Labels').where('Caption', trimmedLabel).first();
+    
+    // Create label if it doesn't exist
+    if (!label) {
+      [label] = await trx('Labels').insert({ Caption: trimmedLabel }).returning('*');
+    }
+    
+    // Associate label with post (ignore if already exists)
+    await trx('PostLabels')
+      .insert({ PostId: postId, LabelId: label.Id })
+      .onConflict(['PostId', 'LabelId'])
+      .ignore();
+  }
 }
 
 /**
@@ -103,23 +150,63 @@ async function createPost(postData) {
  */
 async function updatePost(postData) {
   if (!postData.id) throw new Error('Post id is required for update');
-  const updateFields = {};
   
-  // Only update fields that are provided
-  if (postData.image !== undefined) updateFields.Image = postData.image;
-  if (postData.title !== undefined) updateFields.Title = postData.title;
-  if (postData.content !== undefined) {
-    updateFields.Content = postData.content;
-    updateFields.Preview = truncateContent(postData.content);
+  const trx = await db.transaction();
+  
+  try {
+    // Update all fields as all fields are passed from frontend/admin route
+    const updateFields = {
+      Image: postData.image,
+      Title: postData.title,
+      Content: postData.content,
+      Preview: truncateContent(postData.content),
+      ReadingTime: postData.readingTime,
+      IsPremium: postData.isPremium,
+      Status: getPostStatusDBValue(postData.status),
+      UpdatedOn: db.fn.now()
+    };
+    
+    // Update the post
+    await trx('Posts')
+      .where({ Id: postData.id })
+      .update(updateFields);
+    
+    // Handle labels update with comparison logic
+    // Load existing post labels from DB
+    const existingLabelsQuery = await trx('PostLabels as pl')
+      .join('Labels as l', 'pl.LabelId', 'l.Id')
+      .select('l.Caption', 'pl.LabelId')
+      .where('pl.PostId', postData.id);
+    
+    const existingLabels = existingLabelsQuery.map(row => row.Caption);
+    const newLabels = postData.labels || [];
+    
+    // Compare to find labels to add and delete
+    const labelsToAdd = newLabels.filter(label => !existingLabels.includes(label));
+    const labelsToDelete = existingLabels.filter(label => !newLabels.includes(label));
+    
+    // Delete labels that must be deleted
+    if (labelsToDelete.length > 0) {
+      const labelIdsToDelete = existingLabelsQuery
+        .filter(row => labelsToDelete.includes(row.Caption))
+        .map(row => row.LabelId);
+      
+      await trx('PostLabels')
+        .where('PostId', postData.id)
+        .whereIn('LabelId', labelIdsToDelete)
+        .del();
+    }
+    
+    // Add labels that must be added
+    if (labelsToAdd.length > 0) {
+      await addPostLabels(trx, postData.id, labelsToAdd);
+    }
+    
+    await trx.commit();
+  } catch (error) {
+    await trx.rollback();
+    throw error;
   }
-  if (postData.readingTime !== undefined) updateFields.ReadingTime = postData.readingTime;
-  if (postData.isPremium !== undefined) updateFields.IsPremium = postData.isPremium;
-  
-  updateFields.UpdatedOn = db.fn.now();
-  
-  await db('Posts')
-    .where({ Id: postData.id })
-    .update(updateFields);
 }
 
 /**
@@ -141,6 +228,7 @@ async function getPostList(userId = null, limit = 50, offset = 0) {
       'p.ReadingTime as readingTime',
       'p.CreatedOn as createdOn',
       'p.IsPremium as isPremium',
+      'p.Status as status',
       // User's reaction (if userId provided)
       userId ? 
         db.raw(`(SELECT upr."Reaction" FROM "UserPostReaction" upr WHERE upr."PostId" = p."Id" AND upr."UserId" = ?) as reaction`, [userId]) :
@@ -187,6 +275,7 @@ async function getPostList(userId = null, limit = 50, offset = 0) {
     readingTime: post.readingTime,
     createdOn: post.createdOn,
     isPremium: post.isPremium,
+    status: getPostStatusName(post.status),
     reaction: post.reaction,
     numberOfLikes: parseInt(post.numberOfLikes) || 0,
     numberOfDislikes: parseInt(post.numberOfDislikes) || 0,
@@ -214,6 +303,7 @@ async function getPostById(postId, userId = null) {
       'p.CreatedOn as createdOn',
       'p.UpdatedOn as updatedOn',
       'p.IsPremium as isPremium',
+      'p.Status as status',
       // User's reaction (if userId provided)
       userId ? 
         db.raw(`(SELECT upr.Reaction FROM UserPostReaction upr WHERE upr.PostId = p.Id AND upr.UserId = ?) as reaction`, [userId]) :
@@ -253,6 +343,7 @@ async function getPostById(postId, userId = null) {
     createdOn: post.createdOn,
     updatedOn: post.updatedOn,
     isPremium: post.isPremium,
+    status: getPostStatusName(post.status),
     reaction: post.reaction,
     numberOfLikes: parseInt(post.numberOfLikes) || 0,
     numberOfDislikes: parseInt(post.numberOfDislikes) || 0,

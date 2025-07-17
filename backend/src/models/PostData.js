@@ -1,3 +1,5 @@
+const { getPostStatusName } = require('../utils/postStatusHelper');
+
 class PostData {
   constructor({
     id = null,
@@ -9,6 +11,8 @@ class PostData {
     createdOn = null,
     updatedOn = null,
     isPremium = null,
+    status = 'DRAFT',
+    labels = [],
   } = {}) {
     this.id = id;
     this.image = image;
@@ -19,6 +23,8 @@ class PostData {
     this.createdOn = createdOn;
     this.updatedOn = updatedOn;
     this.isPremium = isPremium;
+    this.status = status;
+    this.labels = labels;
   }
 
   /**
@@ -36,6 +42,8 @@ class PostData {
       createdOn: row.CreatedOn,
       updatedOn: row.UpdatedOn,
       isPremium: row.IsPremium,
+      status: getPostStatusName(row.Status !== undefined ? row.Status : 0), // Default to DRAFT if not set
+      labels: row.labels || [], // This will be populated separately
     });
   }
 }

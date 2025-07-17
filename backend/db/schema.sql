@@ -18,7 +18,8 @@ CREATE TABLE Posts (
     ReadingTime INTEGER,
     CreatedOn TIMESTAMP NOT NULL DEFAULT NOW(),
     UpdatedOn TIMESTAMP NOT NULL DEFAULT NOW(),
-    IsPremium BOOLEAN
+    IsPremium BOOLEAN,
+    Status INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE UserPostReaction (

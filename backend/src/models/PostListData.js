@@ -12,6 +12,7 @@ class PostListData {
       numberOfDislikes = null,
       numberOfComments = null,
       labels = [],
+      status = 'DRAFT', // String status for API responses
     } = {}) {
       this.id = id;
       this.image = image;
@@ -25,6 +26,7 @@ class PostListData {
       this.numberOfDislikes = numberOfDislikes;
       this.numberOfComments = numberOfComments;
       this.labels = labels;
+      this.status = status;
     }
   }
   

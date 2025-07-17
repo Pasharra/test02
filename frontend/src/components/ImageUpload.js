@@ -13,6 +13,9 @@ import {
   Delete as DeleteIcon,
   Edit as EditIcon
 } from '@mui/icons-material';
+import { useAuth0 } from '@auth0/auth0-react';
+
+const BACKEND_URI = process.env.REACT_APP_BACKEND_URI || '';
 
 const ImageUpload = ({ 
   value, 
@@ -23,8 +26,10 @@ const ImageUpload = ({
   maxSize = 2 * 1024 * 1024, // 2MB default
   acceptedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 }) => {
+  const { getAccessTokenSilently } = useAuth0();
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [uploadError, setUploadError] = useState('');
   const fileInputRef = useRef(null);
 
   const validateFile = (file) => {
@@ -53,27 +58,43 @@ const ImageUpload = ({
 
     setUploading(true);
     
-    try {
-      // Create preview URL
-      const previewUrl = URL.createObjectURL(file);
-      
-      // For now, we'll just store the file and preview URL
-      // Later this will be replaced with actual upload to server
-      const imageData = {
-        file,
-        previewUrl,
-        name: file.name,
-        size: file.size,
-        type: file.type
-      };
-      
-      onChange(imageData);
-      
-    } catch (error) {
-      console.error('Error processing file:', error);
-    } finally {
-      setUploading(false);
-    }
+          try {
+        setUploadError('');
+        const token = await getAccessTokenSilently();
+        const formData = new FormData();
+        formData.append('image', file);
+
+        const response = await fetch(`${BACKEND_URI}/api/admin/image/upload`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          body: formData
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to upload image');
+        }
+
+        const data = await response.json();
+        const imageData = {
+          file,
+          previewUrl: data.url,
+          uploadedUrl: data.url,
+          name: file.name,
+          size: file.size,
+          type: file.type
+        };
+        
+        onChange(imageData);
+        
+      } catch (error) {
+        setUploadError(error.message);
+        console.error('Error uploading image:', error);
+      } finally {
+        setUploading(false);
+      }
   };
 
   const handleFileInputChange = (event) => {
@@ -104,9 +125,11 @@ const ImageUpload = ({
   };
 
   const handleRemove = () => {
-    if (value?.previewUrl) {
+    if (value?.previewUrl && !value?.uploadedUrl) {
+      // Only revoke object URL if it's a local preview, not an uploaded image
       URL.revokeObjectURL(value.previewUrl);
     }
+    setUploadError('');
     onChange(null);
   };
 
@@ -253,13 +276,13 @@ const ImageUpload = ({
         </Box>
       )}
 
-      {error && (
+      {(error || uploadError) && (
         <Alert severity="error" sx={{ mt: 1 }}>
-          {error}
+          {error || uploadError}
         </Alert>
       )}
       
-      {helperText && !error && (
+      {helperText && !error && !uploadError && (
         <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
           {helperText}
         </Typography>

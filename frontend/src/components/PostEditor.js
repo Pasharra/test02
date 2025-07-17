@@ -76,19 +76,8 @@ const PostEditor = ({
       newErrors.labels = 'At least one label is required';
     }
 
-    // Banner image validation (optional but validate if provided)
-    if (formData.image) {
-      const maxSize = 2 * 1024 * 1024; // 2MB
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-      
-      if (formData.image.size > maxSize) {
-        newErrors.image = 'Image size must be less than 2MB';
-      }
-      
-      if (!allowedTypes.includes(formData.image.type)) {
-        newErrors.image = 'Image must be PNG, JPG, or WEBP format';
-      }
-    }
+    // Banner image validation is now handled by the ImageUpload component
+    // No additional validation needed here since upload happens during file selection
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -127,9 +116,8 @@ const PostEditor = ({
         title: formData.title.trim(),
         content: formData.content,
         isPremium: formData.isPremium,
-        // TODO: Handle image upload separately when image upload endpoint is ready
-        // For now, we'll just pass the image URL or leave it empty
-        image: formData.image?.previewUrl || '',
+        // Use the uploaded image URL if available
+        image: formData.image?.uploadedUrl || '',
         // Labels are now simple strings, backend will handle creation/association
         labels: formData.labels
       };
