@@ -47,7 +47,8 @@ const PostEditor = ({
     image: initialData?.image || null,
     labels: initialData?.labels || [],
     isPremium: initialData?.isPremium || false,
-    status: initialData?.status || 'DRAFT'
+    status: initialData?.status || 'DRAFT',
+    readingTime: initialData?.readingTime || ''
   });
 
   // Validation state
@@ -69,6 +70,11 @@ const PostEditor = ({
     // Content validation
     if (!formData.content.trim()) {
       newErrors.content = 'Content is required';
+    }
+
+    // Reading time validation
+    if (formData.readingTime && isNaN(parseInt(formData.readingTime))) {
+      newErrors.readingTime = 'Reading time must be a number';
     }
 
     // Labels validation
@@ -116,6 +122,8 @@ const PostEditor = ({
         title: formData.title.trim(),
         content: formData.content,
         isPremium: formData.isPremium,
+        status: formData.status,
+        readingTime: formData.readingTime ? parseInt(formData.readingTime) : null,
         // Use the uploaded image URL if available
         image: formData.image?.uploadedUrl || '',
         // Labels are now simple strings, backend will handle creation/association
@@ -177,7 +185,8 @@ const PostEditor = ({
         image: initialData?.image || null,
         labels: initialData?.labels || [],
         isPremium: initialData?.isPremium || false,
-        status: initialData?.status || 'DRAFT'
+        status: initialData?.status || 'DRAFT',
+        readingTime: initialData?.readingTime || ''
       });
       setErrors({});
       setSubmitError('');
@@ -244,6 +253,21 @@ const PostEditor = ({
                 {errors.content}
               </Typography>
             )}
+          </Grid>
+
+          {/* Reading Time */}
+          <Grid item>
+            <TextField
+              fullWidth
+              label="Approximate Reading Time"
+              value={formData.readingTime}
+              onChange={(e) => handleFieldChange('readingTime', e.target.value)}
+              error={!!errors.readingTime}
+              helperText={errors.readingTime || "Enter reading time in minutes (optional)"}
+              placeholder="e.g., 5"
+              type="number"
+              inputProps={{ min: 0 }}
+            />
           </Grid>
 
           {/* Labels */}

@@ -174,15 +174,14 @@ router.post('/posts', async (req, res) => {
     const postData = new PostData(validation.validatedData);
     
     // Create the post
-    await createPost(postData);
+    const post = await createPost(postData);
     
     res.status(201).json({
       success: true,
       message: 'Post created successfully.',
       post: {
-        title: postData.title,
-        isPremium: postData.isPremium,
-        readingTime: postData.readingTime,
+        id: post.Id,
+        ...validation.validatedData
       }
     });
   } catch (err) {
