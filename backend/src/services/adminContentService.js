@@ -15,7 +15,7 @@ const { getNumberOfActiveSubscriptions } = require('./subscriptionService');
  * @returns {Promise<AdminPostListData[]>} Array of AdminPostListData objects
  */
 async function getPostList(limit = 50, offset = 0) {
-  // Build the main query with subqueries for aggregated data
+  // Build the main query using counter fields from Posts table
   const query = db('Posts as p')
     .select([
       'p.Id as id',
@@ -23,12 +23,9 @@ async function getPostList(limit = 50, offset = 0) {
       'p.CreatedOn as createdOn',
       'p.UpdatedOn as updatedOn',
       'p.Status as status',
-      // Count of likes (reaction = 1)
-      db.raw(`(SELECT COUNT(*) FROM "UserPostReaction" upr WHERE upr."PostId" = p."Id" AND upr."Reaction" = 1) as numberOfLikes`),
-      // Count of dislikes (reaction = -1)
-      db.raw(`(SELECT COUNT(*) FROM "UserPostReaction" upr WHERE upr."PostId" = p."Id" AND upr."Reaction" = -1) as numberOfDislikes`),
-      // Count of comments
-      db.raw(`(SELECT COUNT(*) FROM "PostComments" pc WHERE pc."PostId" = p."Id") as numberOfComments`)
+      'p.Likes as numberOfLikes',
+      'p.Dislikes as numberOfDislikes',
+      'p.Comments as numberOfComments'
     ])
     .orderBy('p.CreatedOn', 'desc')
     .limit(limit)
@@ -63,9 +60,9 @@ async function getPostList(limit = 50, offset = 0) {
     createdOn: post.createdOn,
     updatedOn: post.updatedOn,
     status: getPostStatusName(post.status),
-    numberOfLikes: parseInt(post.numberOfLikes) || 0,
-    numberOfDislikes: parseInt(post.numberOfDislikes) || 0,
-    numberOfComments: parseInt(post.numberOfComments) || 0,
+    numberOfLikes: post.numberOfLikes || 0,
+    numberOfDislikes: post.numberOfDislikes || 0,
+    numberOfComments: post.numberOfComments || 0,
     labels: labelsMap[post.id] || []
   }));
 }
@@ -138,6 +135,9 @@ async function createPost(postData) {
       UpdatedOn: db.fn.now(),
       IsPremium: postData.isPremium,
       Status: postData.status !== undefined ? postData.status : 0, // Default to DRAFT (0)
+      Likes: 0,
+      Dislikes: 0,
+      Comments: 0
     };
     
     const [post] = await trx('Posts').insert(insertFields).returning('*');

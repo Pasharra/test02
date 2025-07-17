@@ -7,6 +7,7 @@ class AdminPostListData {
       numberOfLikes = null,
       numberOfDislikes = null,
       numberOfComments = null,
+      numberOfViews = null,
       labels = [],
       status = 'DRAFT', // String status for API responses
     } = {}) {
@@ -17,6 +18,7 @@ class AdminPostListData {
       this.numberOfLikes = numberOfLikes;
       this.numberOfDislikes = numberOfDislikes;
       this.numberOfComments = numberOfComments;
+      this.numberOfViews = numberOfViews;
       this.labels = labels;
       this.status = status;
     }

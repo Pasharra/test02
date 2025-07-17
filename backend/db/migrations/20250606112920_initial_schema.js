@@ -25,6 +25,10 @@ exports.up = async function(knex) {
     table.timestamp('UpdatedOn').notNullable().defaultTo(knex.fn.now());
     table.boolean('IsPremium').nullable();
     table.integer('Status').notNullable().defaultTo(0);
+    table.integer('Likes').notNullable().defaultTo(0);
+    table.integer('Dislikes').notNullable().defaultTo(0);
+    table.integer('Comments').notNullable().defaultTo(0);
+    table.integer('Views').notNullable().defaultTo(0);
   });
 
   await knex.schema.createTable('Labels', table => {
@@ -103,44 +107,6 @@ exports.up = async function(knex) {
     END;
     $$ LANGUAGE plpgsql;
   `);
-
-  // Create stored procedure for most liked posts
-  await knex.raw(`
-    CREATE OR REPLACE FUNCTION get_most_liked_posts(post_count INTEGER)
-    RETURNS TABLE (
-        title TEXT,
-        number_of_likes BIGINT
-    ) AS $$
-    BEGIN
-        RETURN QUERY
-        SELECT 
-            p."Title" as title,
-            COALESCE((SELECT COUNT(*) FROM "UserPostReaction" upr WHERE upr."PostId" = p."Id" AND upr."Reaction" = 1), 0) as number_of_likes
-        FROM "Posts" p
-        ORDER BY (SELECT COUNT(*) FROM "UserPostReaction" upr WHERE upr."PostId" = p."Id" AND upr."Reaction" = 1) DESC
-        LIMIT post_count;
-    END;
-    $$ LANGUAGE plpgsql;
-  `);
-
-  // Create stored procedure for most commented posts
-  await knex.raw(`
-    CREATE OR REPLACE FUNCTION get_most_commented_posts(post_count INTEGER)
-    RETURNS TABLE (
-        title TEXT,
-        number_of_comments BIGINT
-    ) AS $$
-    BEGIN
-        RETURN QUERY
-        SELECT 
-            p."Title" as title,
-            COALESCE((SELECT COUNT(*) FROM "PostComments" pc WHERE pc."PostId" = p."Id"), 0) as number_of_comments
-        FROM "Posts" p
-        ORDER BY (SELECT COUNT(*) FROM "PostComments" pc WHERE pc."PostId" = p."Id") DESC
-        LIMIT post_count;
-    END;
-    $$ LANGUAGE plpgsql;
-  `);
 };
 
 /**
@@ -149,8 +115,6 @@ exports.up = async function(knex) {
  */
 exports.down = async function(knex) {
   // Drop stored procedures first
-  await knex.raw('DROP FUNCTION IF EXISTS get_most_commented_posts(INTEGER);');
-  await knex.raw('DROP FUNCTION IF EXISTS get_most_liked_posts(INTEGER);');
   await knex.raw('DROP FUNCTION IF EXISTS get_dashboard_metrics();');
   
   // Drop tables in reverse order

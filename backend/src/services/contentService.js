@@ -78,8 +78,6 @@ async function getOrCreateUser(userData, auth0Id, isAdmin = false) {
   return userId ? userId : createUser(userData, auth0Id, isAdmin);
 }
 
-
-
 /**
  * Get a list of posts with aggregated data for the post feed.
  * @param {number} userId - Optional user ID to get user-specific reactions
@@ -89,7 +87,7 @@ async function getOrCreateUser(userData, auth0Id, isAdmin = false) {
  */
 // TODO: add search parameters - title & labels
 async function getPostList(userId = null, limit = 50, offset = 0) {
-  // Build the main query with subqueries for aggregated data
+  // Build the main query using counter fields from Posts table
   const query = db('Posts as p')
     .select([
       'p.Id as id',
@@ -100,17 +98,15 @@ async function getPostList(userId = null, limit = 50, offset = 0) {
       'p.CreatedOn as createdOn',
       'p.IsPremium as isPremium',
       'p.Status as status',
+      'p.Likes as numberOfLikes',
+      'p.Dislikes as numberOfDislikes',
+      'p.Comments as numberOfComments',
       // User's reaction (if userId provided)
       userId ? 
         db.raw(`(SELECT upr."Reaction" FROM "UserPostReaction" upr WHERE upr."PostId" = p."Id" AND upr."UserId" = ?) as reaction`, [userId]) :
-        db.raw('NULL as reaction'),
-      // Count of likes (reaction = 1)
-      db.raw(`(SELECT COUNT(*) FROM "UserPostReaction" upr WHERE upr."PostId" = p."Id" AND upr."Reaction" = 1) as numberOfLikes`),
-      // Count of dislikes (reaction = -1)
-      db.raw(`(SELECT COUNT(*) FROM "UserPostReaction" upr WHERE upr."PostId" = p."Id" AND upr."Reaction" = -1) as numberOfDislikes`),
-      // Count of comments
-      db.raw(`(SELECT COUNT(*) FROM "PostComments" pc WHERE pc."PostId" = p."Id") as numberOfComments`)
+        db.raw('NULL as reaction')
     ])
+    .where('p.Status', 1) // Only include published posts
     .orderBy('p.CreatedOn', 'desc')
     .limit(limit)
     .offset(offset);
@@ -148,9 +144,9 @@ async function getPostList(userId = null, limit = 50, offset = 0) {
     isPremium: post.isPremium,
     status: getPostStatusName(post.status),
     reaction: post.reaction,
-    numberOfLikes: parseInt(post.numberOfLikes) || 0,
-    numberOfDislikes: parseInt(post.numberOfDislikes) || 0,
-    numberOfComments: parseInt(post.numberOfComments) || 0,
+    numberOfLikes: post.numberOfLikes || 0,
+    numberOfDislikes: post.numberOfDislikes || 0,
+    numberOfComments: post.numberOfComments || 0,
     labels: labelsMap[post.id] || []
   }));
 }
@@ -162,7 +158,7 @@ async function getPostList(userId = null, limit = 50, offset = 0) {
  * @returns {Promise<PostDetailData|null>} PostDetailData object or null if not found
  */
 async function getPostById(postId, userId = null) {
-  // Build the query with subqueries for aggregated data
+  // Build the query using counter fields from Posts table
   const query = db('Posts as p')
     .select([
       'p.Id as id',
@@ -175,18 +171,16 @@ async function getPostById(postId, userId = null) {
       'p.UpdatedOn as updatedOn',
       'p.IsPremium as isPremium',
       'p.Status as status',
+      'p.Likes as numberOfLikes',
+      'p.Dislikes as numberOfDislikes',
+      'p.Comments as numberOfComments',
       // User's reaction (if userId provided)
       userId ? 
         db.raw(`(SELECT upr.Reaction FROM UserPostReaction upr WHERE upr.PostId = p.Id AND upr.UserId = ?) as reaction`, [userId]) :
-        db.raw('NULL as reaction'),
-      // Count of likes (reaction = 1)
-      db.raw(`(SELECT COUNT(*) FROM UserPostReaction upr WHERE upr.PostId = p.Id AND upr.Reaction = 1) as numberOfLikes`),
-      // Count of dislikes (reaction = -1)
-      db.raw(`(SELECT COUNT(*) FROM UserPostReaction upr WHERE upr.PostId = p.Id AND upr.Reaction = -1) as numberOfDislikes`),
-      // Count of comments
-      db.raw(`(SELECT COUNT(*) FROM PostComments pc WHERE pc.PostId = p.Id) as numberOfComments`)
+        db.raw('NULL as reaction')
     ])
     .where('p.Id', postId)
+    .where('p.Status', 1) // Only include published posts
     .first();
 
   const post = await query;
@@ -216,9 +210,9 @@ async function getPostById(postId, userId = null) {
     isPremium: post.isPremium,
     status: getPostStatusName(post.status),
     reaction: post.reaction,
-    numberOfLikes: parseInt(post.numberOfLikes) || 0,
-    numberOfDislikes: parseInt(post.numberOfDislikes) || 0,
-    numberOfComments: parseInt(post.numberOfComments) || 0,
+    numberOfLikes: post.numberOfLikes || 0,
+    numberOfDislikes: post.numberOfDislikes || 0,
+    numberOfComments: post.numberOfComments || 0,
     labels: labels
   });
 }
