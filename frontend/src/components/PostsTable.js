@@ -234,9 +234,13 @@ const PostsTable = () => {
                 
                 <TableCell>
                   <Chip 
-                    label="Published" 
+                    label={post.status || 'DRAFT'} 
                     size="small" 
-                    color="success" 
+                    color={
+                      post.status === 'PUBLISHED' ? 'success' : 
+                      post.status === 'DRAFT' ? 'warning' : 
+                      'default'
+                    }
                     variant="outlined"
                   />
                 </TableCell>
