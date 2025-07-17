@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { checkJwt, checkAdmin } = require('../utils/authHelper');
-const { getPostList, getPostById, createPost, updatePost, getMetrics } = require('../services/adminContentService');
+const { getPostList, getPostById, createPost, updatePost, updatePostStatus, getMetrics } = require('../services/adminContentService');
 const PostData = require('../models/PostData');
 const multer = require('multer');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
@@ -153,9 +153,7 @@ function validatePostData(body) {
   const trimmedLabels = labels.map(label => label.trim()).filter(label => label.length > 0);
   const distinctLabels = [...new Set(trimmedLabels)];
   validatedData.labels = distinctLabels;
-  
-  validatedData.status = getPostStatusDBValue(status);
-  
+  validatedData.status = status;
   return { isValid: true, errors: [], validatedData };
 }
 
@@ -267,16 +265,12 @@ router.put('/posts/:id', async (req, res) => {
       return res.status(400).json({ error: validation.errors.join(' ') });
     }
     
-    // Check if there's at least one field to update
-    if (Object.keys(validation.validatedData).length === 0) {
-      return res.status(400).json({ error: 'At least one field must be provided for update.' });
-    }
-    
     // Create PostData instance with ID
     const postData = new PostData({
       id: postId,
       ...validation.validatedData
     });
+    console.log('Post data:', postData);
     
     // Update the post
     await updatePost(postData);
@@ -284,10 +278,7 @@ router.put('/posts/:id', async (req, res) => {
     res.json({
       success: true,
       message: 'Post updated successfully.',
-      post: {
-        id: postData.id,
-        ...validation.validatedData
-      }
+      post: postData
     });
   } catch (err) {
     console.error('PUT /api/admin/posts/:id error:', err.message);
@@ -295,6 +286,41 @@ router.put('/posts/:id', async (req, res) => {
       return res.status(400).json({ error: 'Invalid post data.' });
     }
     res.status(500).json({ error: 'Failed to update post.' });
+  }
+});
+
+// POST /api/admin/posts/:id/:status
+router.post('/posts/:id/:status', async (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    const status = req.params.status;
+    
+    // Validate post ID
+    if (isNaN(postId) || postId <= 0) {
+      return res.status(400).json({ error: 'Invalid post ID.' });
+    }
+    
+    // Validate status
+    if (!isValidPostStatus(status)) {
+      return res.status(400).json({ 
+        error: `Invalid status. Must be one of: ${getValidPostStatuses().join(', ')}.` 
+      });
+    }
+    
+    // Update the post status
+    const success = await updatePostStatus(postId, status);
+    
+    if (!success) {
+      return res.status(404).json({ error: 'Post not found.' });
+    }
+    
+    res.json({
+      success: true,
+      message: `Post status updated to ${status} successfully.`
+    });
+  } catch (err) {
+    console.error('POST /api/admin/posts/:id/:status error:', err.message);
+    res.status(500).json({ error: 'Failed to update post status.' });
   }
 });
 

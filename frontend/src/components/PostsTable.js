@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useImperativeHandle, forwardRef } from 'react';
 import {
   Table,
   TableBody,
@@ -19,7 +19,7 @@ import {
 import {
   Edit as EditIcon,
   Archive as ArchiveIcon,
-  Delete as DeleteIcon,
+  Unarchive as UnarchiveIcon,
   Visibility as ViewsIcon,
   ThumbUp as LikesIcon,
   Comment as CommentsIcon
@@ -28,7 +28,7 @@ import { useAuth0 } from '@auth0/auth0-react';
 
 const BACKEND_URI = process.env.REACT_APP_BACKEND_URI || '';
 
-const PostsTable = () => {
+const PostsTable = forwardRef(({ onEdit }, ref) => {
   const { getAccessTokenSilently } = useAuth0();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -98,6 +98,18 @@ const PostsTable = () => {
     }
   }, [getAccessTokenSilently, loading]);
 
+  // Refresh function to reload posts from the beginning
+  const refreshPosts = useCallback(() => {
+    setPage(0);
+    setHasMore(true);
+    fetchPosts(0, false);
+  }, [fetchPosts]);
+
+  // Expose refresh function to parent component
+  useImperativeHandle(ref, () => ({
+    refresh: refreshPosts
+  }));
+
   // Load more posts for infinite scroll
   const loadMorePosts = useCallback(() => {
     if (hasMore && !loading && posts.length > 0) {
@@ -144,20 +156,55 @@ const PostsTable = () => {
     }
   }, [fetchPosts]);
 
-  // Action handlers (placeholder implementations)
+  // Action handlers
   const handleEdit = (postId) => {
-    console.log('Edit post:', postId);
-    // TODO: Implement edit functionality
+    if (onEdit) {
+      onEdit(postId);
+    }
   };
 
-  const handleArchive = (postId) => {
-    console.log('Archive post:', postId);
-    // TODO: Implement archive functionality
+  const handleArchive = async (postId) => {
+    try {
+      const token = await getAccessTokenSilently();
+      const response = await fetch(`${BACKEND_URI}/api/admin/posts/${postId}/ARCHIVED`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to archive post');
+      }
+
+      // Refresh the table after successful archive
+      refreshPosts();
+    } catch (err) {
+      console.error('Error archiving post:', err);
+      setError('Failed to archive post. Please try again.');
+    }
   };
 
-  const handleDelete = (postId) => {
-    console.log('Delete post:', postId);
-    // TODO: Implement delete functionality
+  const handleUnarchive = async (postId) => {
+    try {
+      const token = await getAccessTokenSilently();
+      const response = await fetch(`${BACKEND_URI}/api/admin/posts/${postId}/PUBLISHED`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to unarchive post');
+      }
+
+      // Refresh the table after successful unarchive
+      refreshPosts();
+    } catch (err) {
+      console.error('Error unarchiving post:', err);
+      setError('Failed to unarchive post. Please try again.');
+    }
   };
 
   if (error) {
@@ -318,25 +365,31 @@ const PostsTable = () => {
                       </IconButton>
                     </Tooltip>
                     
-                    <Tooltip title="Archive Post">
-                      <IconButton 
-                        size="small" 
-                        color="secondary"
-                        onClick={() => handleArchive(post.id)}
-                      >
-                        <ArchiveIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
+                    {/* Show Archive button for DRAFT and PUBLISHED posts */}
+                    {(post.status === 'DRAFT' || post.status === 'PUBLISHED') && (
+                      <Tooltip title="Archive Post">
+                        <IconButton 
+                          size="small" 
+                          color="secondary"
+                          onClick={() => handleArchive(post.id)}
+                        >
+                          <ArchiveIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                     
-                    <Tooltip title="Delete Post">
-                      <IconButton 
-                        size="small" 
-                        color="error"
-                        onClick={() => handleDelete(post.id)}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
+                    {/* Show Unarchive button only for ARCHIVED posts */}
+                    {post.status === 'ARCHIVED' && (
+                      <Tooltip title="Unarchive Post">
+                        <IconButton 
+                          size="small" 
+                          color="success"
+                          onClick={() => handleUnarchive(post.id)}
+                        >
+                          <UnarchiveIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                   </Stack>
                 </TableCell>
               </TableRow>
@@ -372,6 +425,6 @@ const PostsTable = () => {
       )}
     </Box>
   );
-};
+});
 
 export default PostsTable; 

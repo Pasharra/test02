@@ -277,6 +277,28 @@ function truncateContent(text) {
 }
 
 /**
+ * Update the status of a post.
+ * @param {number} postId - The post ID to update
+ * @param {string} status - The new status (e.g., 'PUBLISHED', 'DRAFT', 'ARCHIVED')
+ * @returns {Promise<boolean>} True if update succeeded, false if post not found
+ */
+async function updatePostStatus(postId, status) {
+  // Convert status string to database value
+  const statusValue = getPostStatusDBValue(status);
+  
+  // Update the post status and updatedOn timestamp
+  const result = await db('Posts')
+    .where('Id', postId)
+    .update({
+      Status: statusValue,
+      UpdatedOn: db.fn.now()
+    });
+  
+  // Return true if a row was updated (post found), false otherwise
+  return result > 0;
+}
+
+/**
  * Get metrics data for the dashboard.
  * @returns {Promise<MetricsData>} MetricsData object
  */
@@ -328,6 +350,7 @@ module.exports = {
   getPostById,
   createPost,
   updatePost,
+  updatePostStatus,
   addPostLabels,
   truncateContent,
   getMetrics,
