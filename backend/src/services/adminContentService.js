@@ -8,6 +8,7 @@ const MetricsData = require('../models/MetricsData');
 const { getPostStatusName, getPostStatusDBValue } = require('../utils/postStatusHelper');
 const { getNumberOfActiveSubscriptions } = require('./subscriptionService');
 const { getPostSortColumn, DEFAULT_POST_SORT } = require('../utils/postSortHelper');
+const PostFilter = require('../models/PostFilter');
 
 // In-memory cache for metrics
 let metricsCache = {
@@ -21,11 +22,12 @@ let metricsCache = {
  * @param {number} limit - Optional limit for pagination (default: 50)
  * @param {number} offset - Optional offset for pagination (default: 0)
  * @param {string} sort - Optional sort parameter (default: 'date')
+ * @param {PostFilter} filter - Optional filter parameters
  * @returns {Promise<AdminPostListData[]>} Array of AdminPostListData objects
  */
-async function getPostList(limit = 50, offset = 0, sort = DEFAULT_POST_SORT) {
-  // Build the main query using counter fields from Posts table
-  const query = db('Posts as p')
+async function getPostList(limit = 50, offset = 0, sort = DEFAULT_POST_SORT, filter = null) {
+    // Build the main query using counter fields from Posts table
+  let query = db('Posts as p')
     .select([
       'p.Id as id',
       'p.Title as title',
@@ -36,10 +38,41 @@ async function getPostList(limit = 50, offset = 0, sort = DEFAULT_POST_SORT) {
       'p.Dislikes as numberOfDislikes',
       'p.Comments as numberOfComments',
       'p.Views as numberOfViews'
-          ])
-      .orderBy(`p.${getPostSortColumn(sort)}`, 'desc')
-      .limit(limit)
-      .offset(offset);
+    ]);
+
+  // Apply filters if provided
+  if (filter && filter.hasFilters()) {
+    // Title filter - starts with
+    if (filter.title) {
+      query = query.where('p.Title', 'ilike', `${filter.title}%`);
+    }
+
+    // Status filter - exact match
+    if (filter.status) {
+      const statusValue = getPostStatusDBValue(filter.status);
+      query = query.where('p.Status', statusValue);
+    }
+
+    // Labels filter - post must have all specified labels
+    if (filter.labels && filter.labels.length > 0) {
+      // For each label, ensure the post has it
+      filter.labels.forEach(label => {
+        query = query.whereExists(function() {
+          this.select('*')
+            .from('PostLabels as pl')
+            .join('Labels as l', 'pl.LabelId', 'l.Id')
+            .whereRaw('pl.PostId = p.Id')
+            .where('l.Caption', label);
+        });
+      });
+    }
+  }
+
+  // Apply sorting, pagination
+  query = query
+    .orderBy(`p.${getPostSortColumn(sort)}`, 'desc')
+    .limit(limit)
+    .offset(offset);
 
   const posts = await query;
 

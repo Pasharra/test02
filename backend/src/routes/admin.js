@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const config = require('../utils/config');
 const { getPostStatusDBValue, isValidPostStatus, getValidPostStatuses } = require('../utils/postStatusHelper');
 const { isValidPostSort, getValidPostSorts, DEFAULT_POST_SORT } = require('../utils/postSortHelper');
+const PostFilter = require('../models/PostFilter');
 
 // Configure S3 client
 const s3 = new S3Client({
@@ -159,13 +160,33 @@ function validatePostData(body) {
 }
 
 // GET /api/admin/posts
-// Query params: limit, offset, sort (all optional)
+// Query params: limit, offset, sort, title, status, labels (all optional)
 router.get('/posts', async (req, res) => {
   try {
     // Parse query parameters
     const limit = req.query.limit ? parseInt(req.query.limit) : 50;
     const offset = req.query.offset ? parseInt(req.query.offset) : 0;
     const sort = req.query.sort || DEFAULT_POST_SORT;
+    
+    // Parse filter parameters
+    const filterOptions = {};
+    if (req.query.title) {
+      filterOptions.title = req.query.title;
+    }
+    if (req.query.status) {
+      filterOptions.status = req.query.status;
+    }
+    if (req.query.labels) {
+      // Support both single label and comma-separated labels
+      if (Array.isArray(req.query.labels)) {
+        filterOptions.labels = req.query.labels;
+      } else {
+        filterOptions.labels = req.query.labels.split(',').map(label => label.trim()).filter(label => label.length > 0);
+      }
+    }
+
+    // Create filter object
+    const filter = new PostFilter(filterOptions);
     
     // Validate query parameters
     if (isNaN(limit) || limit < 1 || limit > 100) {
@@ -180,8 +201,30 @@ router.get('/posts', async (req, res) => {
       });
     }
 
+    // Basic filter validation
+    if (filter.title && (typeof filter.title !== 'string' || filter.title.trim().length === 0)) {
+      return res.status(400).json({ error: 'Title filter must be a non-empty string.' });
+    }
+    if (filter.labels && filter.labels.length > 0) {
+      if (!Array.isArray(filter.labels)) {
+        return res.status(400).json({ error: 'Labels filter must be an array.' });
+      }
+      for (const label of filter.labels) {
+        if (typeof label !== 'string' || label.trim().length === 0) {
+          return res.status(400).json({ error: 'All label filters must be non-empty strings.' });
+        }
+      }
+    }
+
+    // Validate status filter if provided
+    if (filter.status && !isValidPostStatus(filter.status)) {
+      return res.status(400).json({ 
+        error: `Invalid status filter. Must be one of: ${getValidPostStatuses().join(', ')}.` 
+      });
+    }
+
     // Get posts list using admin service
-    const posts = await getPostList(limit, offset, sort);
+    const posts = await getPostList(limit, offset, sort, filter.hasFilters() ? filter : null);
     
     res.json({
       success: true,
@@ -191,7 +234,12 @@ router.get('/posts', async (req, res) => {
         offset,
         sort,
         count: posts.length
-      }
+      },
+      filters: filter.hasFilters() ? {
+        title: filter.title,
+        status: filter.status,
+        labels: filter.labels
+      } : null
     });
   } catch (err) {
     console.error('GET /api/admin/posts error:', err.message);
