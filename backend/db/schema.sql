@@ -58,6 +58,23 @@ CREATE TABLE PostComments (
     FOREIGN KEY (PostId) REFERENCES Posts(Id)
 );
 
+CREATE TABLE PostViews (
+    UserId INTEGER,
+    PostId INTEGER,
+    CreatedOn TIMESTAMP NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (UserId, PostId, CreatedOn),
+    FOREIGN KEY (UserId) REFERENCES Users(Id),
+    FOREIGN KEY (PostId) REFERENCES Posts(Id)
+);
+
+CREATE TABLE FavoritePosts (
+    UserId INTEGER NOT NULL,
+    PostId INTEGER NOT NULL,
+    PRIMARY KEY (UserId, PostId),
+    FOREIGN KEY (UserId) REFERENCES Users(Id),
+    FOREIGN KEY (PostId) REFERENCES Posts(Id)
+);
+
 -- Stored procedure to get dashboard metrics
 CREATE OR REPLACE FUNCTION get_dashboard_metrics()
 RETURNS TABLE (

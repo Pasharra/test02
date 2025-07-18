@@ -362,6 +362,7 @@ async function getMetrics() {
     // Call stored procedures and get active subscriptions in parallel
     const [dbResult, activeSubscriptions, mostLikedResult, mostCommentedResult] = await Promise.all([
       db.raw('SELECT * FROM get_dashboard_metrics()'),
+      // TODO: Pie chart or breakdown of subscription plan distribution (monthly vs. yearly)
       getNumberOfActiveSubscriptions(),
       db.raw('SELECT "Title", "Likes" FROM "Posts" WHERE "Status" = 1 ORDER BY "Likes" DESC LIMIT 5'),
       db.raw('SELECT "Title", "Comments" FROM "Posts" WHERE "Status" = 1 ORDER BY "Comments" DESC LIMIT 5')

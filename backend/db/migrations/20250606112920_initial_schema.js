@@ -63,6 +63,26 @@ exports.up = async function(knex) {
     table.foreign('PostId').references('Posts.Id');
   });
 
+  await knex.schema.createTable('PostViews', table => {
+    table.integer('UserId').nullable();
+    table.integer('PostId').notNullable();
+    table.timestamp('ViewedOn').notNullable().defaultTo(knex.fn.now());
+    table.string('IpAddress', 45).nullable(); // Support both IPv4 and IPv6
+    table.string('UserAgent', 500).nullable();
+    table.primary(['UserId', 'PostId', 'ViewedOn']);
+    table.foreign('UserId').references('Users.Id');
+    table.foreign('PostId').references('Posts.Id');
+  });
+
+  await knex.schema.createTable('FavoritePosts', table => {
+    table.integer('UserId').notNullable();
+    table.integer('PostId').notNullable();
+    table.timestamp('CreatedOn').notNullable().defaultTo(knex.fn.now());
+    table.primary(['UserId', 'PostId']);
+    table.foreign('UserId').references('Users.Id');
+    table.foreign('PostId').references('Posts.Id');
+  });
+
   // Create stored procedure for dashboard metrics
   await knex.raw(`
     CREATE OR REPLACE FUNCTION get_dashboard_metrics()
@@ -118,6 +138,8 @@ exports.down = async function(knex) {
   await knex.raw('DROP FUNCTION IF EXISTS get_dashboard_metrics();');
   
   // Drop tables in reverse order
+  await knex.schema.dropTableIfExists('FavoritePosts');
+  await knex.schema.dropTableIfExists('PostViews');
   await knex.schema.dropTableIfExists('PostComments');
   await knex.schema.dropTableIfExists('PostLabels');
   await knex.schema.dropTableIfExists('UserPostReaction');
