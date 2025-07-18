@@ -28,7 +28,7 @@ import { useAuth0 } from '@auth0/auth0-react';
 
 const BACKEND_URI = process.env.REACT_APP_BACKEND_URI || '';
 
-const PostsTable = forwardRef(({ onEdit, filters = {} }, ref) => {
+const AdminPostTable = forwardRef(({ onEdit, filters = {} }, ref) => {
   const { getAccessTokenSilently } = useAuth0();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -460,4 +460,4 @@ const PostsTable = forwardRef(({ onEdit, filters = {} }, ref) => {
   );
 });
 
-export default PostsTable; 
+export default AdminPostTable; 

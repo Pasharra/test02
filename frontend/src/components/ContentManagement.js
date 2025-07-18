@@ -23,7 +23,7 @@ import {
   Clear as ClearIcon
 } from '@mui/icons-material';
 import { useAuth0 } from '@auth0/auth0-react';
-import PostsTable from './PostsTable';
+import AdminPostTable from './AdminPostTable';
 import PostEditor from './PostEditor';
 import LabelsSelector from './LabelsSelector';
 
@@ -31,7 +31,7 @@ const BACKEND_URI = process.env.REACT_APP_BACKEND_URI || '';
 
 const ContentManagement = () => {
   const { getAccessTokenSilently } = useAuth0();
-  const postsTableRef = useRef();
+  const adminPostTableRef = useRef();
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorMode, setEditorMode] = useState('create');
   const [editingPost, setEditingPost] = useState(null);
@@ -98,11 +98,11 @@ const ContentManagement = () => {
     console.log('Post saved:', result);
     console.log('Refreshing posts table...');
     // Refresh the posts table to show the updated data
-    if (postsTableRef.current) {
-      postsTableRef.current.refresh();
+    if (adminPostTableRef.current) {
+      adminPostTableRef.current.refresh();
       console.log('Posts table refresh called');
     } else {
-      console.error('PostsTable ref is not available');
+      console.error('AdminPostTable ref is not available');
     }
   };
 
@@ -255,8 +255,8 @@ const ContentManagement = () => {
       )}
       
       <Box>
-        <PostsTable 
-          ref={postsTableRef} 
+        <AdminPostTable 
+          ref={adminPostTableRef} 
           onEdit={handleEditPost}
           filters={filters}
         />
