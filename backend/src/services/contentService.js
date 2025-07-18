@@ -16,7 +16,7 @@ const { getPostStatusName, getPostStatusDBValue } = require('../utils/postStatus
  */
 async function tryGetUserId(auth0Id) {
   if (!auth0Id) return null;
-  const [row] = await db('Users').where({ Auth0Id: auth0Id }).first();
+  const [row] = await db('Users').where({ Auth0Id: auth0Id });
   return row ? row.Id : null;
 }
 

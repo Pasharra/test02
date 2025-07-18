@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { updateUserProfile, getUserProfile, resendEmailVerification } = require('../services/authService');
-const { checkJwt } = require('../utils/authHelper');
+const { checkJwt, isUserAdmin } = require('../utils/authHelper');
 const multer = require('multer');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const path = require('path');
@@ -39,7 +39,7 @@ router.post('/', checkJwt, async (req, res) => {
     await updateUser(userData, user_id, isUserAdmin(req));
     res.json({ success: true, user: updated });
   } catch (err) {
-    console.error('Profile update error:', err.response?.data || err.message);
+    console.error('Profile update error:', err);
     res.status(500).json({ error: 'Could not update profile. Please try again.' });
   }
 });
