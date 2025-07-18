@@ -153,10 +153,13 @@ const PostEditor = ({
 
       const result = await response.json();
       
-      // Call onSave callback
+      // Call onSave callback before closing dialog
       if (onSave) {
         onSave(result);
       }
+
+      // Small delay to ensure refresh completes before closing
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Close dialog
       onClose();
@@ -179,10 +182,26 @@ const PostEditor = ({
   // Reset form when dialog opens/closes
   React.useEffect(() => {
     if (open) {
+      // Convert image URL string to ImageUpload format for editing
+      let imageData = null;
+      if (initialData?.image && typeof initialData.image === 'string') {
+        // If image is a URL string, convert it to the format expected by ImageUpload
+        imageData = {
+          previewUrl: initialData.image,
+          uploadedUrl: initialData.image,
+          name: 'Banner Image',
+          size: 0,
+          type: 'image/jpeg'
+        };
+      } else if (initialData?.image && typeof initialData.image === 'object') {
+        // If image is already an object, use it as is
+        imageData = initialData.image;
+      }
+
       setFormData({
         title: initialData?.title || '',
         content: initialData?.content || '',
-        image: initialData?.image || null,
+        image: imageData,
         labels: initialData?.labels || [],
         isPremium: initialData?.isPremium || false,
         status: initialData?.status || 'DRAFT',
@@ -215,7 +234,6 @@ const PostEditor = ({
               value={formData.image}
               onChange={(value) => handleFieldChange('image', value)}
               error={errors.image}
-              helperText="Upload a banner image for your post"
             />
           </Grid>
 

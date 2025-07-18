@@ -253,26 +253,6 @@ const ImageUpload = ({
               <strong>{value.name}</strong> ({formatFileSize(value.size)})
             </Typography>
           </Paper>
-          
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<EditIcon />}
-              onClick={handleReplace}
-            >
-              Replace
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              color="error"
-              startIcon={<DeleteIcon />}
-              onClick={handleRemove}
-            >
-              Remove
-            </Button>
-          </Box>
         </Box>
       )}
 

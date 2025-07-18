@@ -96,9 +96,13 @@ const ContentManagement = () => {
 
   const handlePostSave = (result) => {
     console.log('Post saved:', result);
+    console.log('Refreshing posts table...');
     // Refresh the posts table to show the updated data
     if (postsTableRef.current) {
       postsTableRef.current.refresh();
+      console.log('Posts table refresh called');
+    } else {
+      console.error('PostsTable ref is not available');
     }
   };
 

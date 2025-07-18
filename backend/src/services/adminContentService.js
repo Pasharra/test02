@@ -61,7 +61,7 @@ async function getPostList(limit = 50, offset = 0, sort = DEFAULT_POST_SORT, fil
           this.select('*')
             .from('PostLabels as pl')
             .join('Labels as l', 'pl.LabelId', 'l.Id')
-            .whereRaw('pl.PostId = p.Id')
+            .whereRaw('"pl"."PostId" = "p"."Id"')
             .where('l.Caption', label);
         });
       });

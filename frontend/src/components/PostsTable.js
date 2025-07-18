@@ -54,8 +54,14 @@ const PostsTable = forwardRef(({ onEdit, filters = {} }, ref) => {
 
   // Fetch posts from API
   const fetchPosts = useCallback(async (pageNum = 0, append = false) => {
-    if (loading || !hasMore) return;
-    console.log('fetchPosts', pageNum, append, hasMore);
+    console.log('fetchPosts called', pageNum, append, hasMore);
+    
+    // Prevent multiple simultaneous requests
+    if (loading) {
+      console.log('Already loading, skipping request');
+      return;
+    }
+    
     try {
       setLoading(true);
       setError('');
@@ -114,12 +120,29 @@ const PostsTable = forwardRef(({ onEdit, filters = {} }, ref) => {
     } finally {
       setLoading(false);
     }
-  }, [getAccessTokenSilently, loading, filters]);
+  }, [getAccessTokenSilently, filters]);
+
+  // Initial load
+  useEffect(() => {
+    console.log('Initial load useEffect triggered');
+    fetchPosts(0, false);
+  }, []);
+
+  // Filter changes - only when filters are actually applied
+  useEffect(() => {
+    console.log('Applied filters changed');
+    // Reset pagination when filters change
+    setPage(0);
+    setHasMore(true);
+    fetchPosts(0, false);
+  }, [filters.title, filters.status, filters.sort, JSON.stringify(filters.labels)]);
 
   // Refresh function to reload posts from the beginning
   const refreshPosts = useCallback(() => {
+    console.log('refreshPosts called');
     setPage(0);
     setHasMore(true);
+    // Force a refresh by calling fetchPosts directly
     fetchPosts(0, false);
   }, [fetchPosts]);
 
@@ -165,20 +188,6 @@ const PostsTable = forwardRef(({ onEdit, filters = {} }, ref) => {
       }
     };
   }, [hasMore, loading, loadMorePosts, posts.length]);
-
-  // Initial load
-  useEffect(() => {
-    fetchPosts(0, false);
-  }, []);
-
-  // Filter changes - only when filters are actually applied
-  useEffect(() => {
-    console.log('Applied filters changed');
-    // Reset pagination when filters change
-    setPage(0);
-    setHasMore(true);
-    fetchPosts(0, false);
-  }, [filters.title, filters.status, filters.sort, JSON.stringify(filters.labels), fetchPosts]);
 
   // Action handlers
   const handleEdit = (postId) => {
