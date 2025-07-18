@@ -9,6 +9,13 @@ const { getPostStatusName, getPostStatusDBValue } = require('../utils/postStatus
 const { getNumberOfActiveSubscriptions } = require('./subscriptionService');
 const { getPostSortColumn, DEFAULT_POST_SORT } = require('../utils/postSortHelper');
 
+// In-memory cache for metrics
+let metricsCache = {
+  data: null,
+  timestamp: null,
+  ttl: 15 * 60 * 1000 // 15 minutes in milliseconds
+};
+
 /**
  * Get a list of posts with aggregated data for admin management.
  * @param {number} limit - Optional limit for pagination (default: 50)
@@ -304,32 +311,41 @@ async function updatePostStatus(postId, status) {
 }
 
 /**
- * Get metrics data for the dashboard.
+ * Get metrics data for the dashboard with 15-minute in-memory caching.
  * @returns {Promise<MetricsData>} MetricsData object
  */
 async function getMetrics() {
-  // TODO: cache this in memory
+  const now = Date.now();
+  
+  // Check if cached data is still valid
+  if (metricsCache.data && metricsCache.timestamp && (now - metricsCache.timestamp) < metricsCache.ttl) {
+    console.log('Returning cached metrics data');
+    return metricsCache.data;
+  }
+  
   try {
+    console.log('Fetching fresh metrics data');
+    
     // Call stored procedures and get active subscriptions in parallel
     const [dbResult, activeSubscriptions, mostLikedResult, mostCommentedResult] = await Promise.all([
       db.raw('SELECT * FROM get_dashboard_metrics()'),
       getNumberOfActiveSubscriptions(),
-      db.raw('SELECT * FROM get_most_liked_posts(5)'),
-      db.raw('SELECT * FROM get_most_commented_posts(5)')
+      db.raw('SELECT "Title", "Likes" FROM "Posts" WHERE "Status" = 1 ORDER BY "Likes" DESC LIMIT 5'),
+      db.raw('SELECT "Title", "Comments" FROM "Posts" WHERE "Status" = 1 ORDER BY "Comments" DESC LIMIT 5')
     ]);
     
     const metrics = dbResult.rows[0];
     const top5MostLikedPosts = mostLikedResult.rows.map(row => new PostListData({
-      title: row.title,
-      numberOfLikes: parseInt(row.number_of_likes) || 0
+      title: row.Title,
+      numberOfLikes: row.Likes
     }));
     const top5MostCommentedPosts = mostCommentedResult.rows.map(row => new PostListData({
-      title: row.title,
-      numberOfComments: parseInt(row.number_of_comments) || 0
+      title: row.Title,
+      numberOfComments: row.Comments
     }));
     
     // Create MetricsData object with the stored procedure results and subscription count
-    return new MetricsData({
+    const metricsData = new MetricsData({
       totalUsers: parseInt(metrics.total_users) || 0,
       newUsersInLast7Days: parseInt(metrics.new_users_in_last_7_days) || 0,
       newUsersInLast30Days: parseInt(metrics.new_users_in_last_30_days) || 0,
@@ -343,6 +359,12 @@ async function getMetrics() {
       userSignups: [10, 8, 3, 11, 15, 6, 7],
       publishedPosts: [3, 2, 5, 1, 7, 4, 4],
     });
+    
+    // Cache the result
+    metricsCache.data = metricsData;
+    metricsCache.timestamp = now;
+    
+    return metricsData;
   } catch (error) {
     console.error('Error getting metrics:', error);
     // Return empty MetricsData object on error
