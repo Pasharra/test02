@@ -28,7 +28,7 @@ import { useAuth0 } from '@auth0/auth0-react';
 
 const BACKEND_URI = process.env.REACT_APP_BACKEND_URI || '';
 
-const PostsTable = forwardRef(({ onEdit }, ref) => {
+const PostsTable = forwardRef(({ onEdit, filters = {} }, ref) => {
   const { getAccessTokenSilently } = useAuth0();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -54,7 +54,7 @@ const PostsTable = forwardRef(({ onEdit }, ref) => {
 
   // Fetch posts from API
   const fetchPosts = useCallback(async (pageNum = 0, append = false) => {
-    if (loading) return;
+    if (loading || !hasMore) return;
     console.log('fetchPosts', pageNum, append, hasMore);
     try {
       setLoading(true);
@@ -63,8 +63,26 @@ const PostsTable = forwardRef(({ onEdit }, ref) => {
       const token = await getAccessTokenSilently();
       const offset = pageNum * POSTS_PER_PAGE;
       
+      // Build query parameters
+      const params = new URLSearchParams({
+        limit: POSTS_PER_PAGE,
+        offset: offset,
+        sort: filters.sort || 'date'
+      });
+
+      // Add filter parameters if they exist
+      if (filters.title && filters.title.trim()) {
+        params.append('title', filters.title.trim());
+      }
+      if (filters.status && filters.status.trim()) {
+        params.append('status', filters.status.trim());
+      }
+      if (filters.labels && filters.labels.length > 0) {
+        params.append('labels', filters.labels.join(','));
+      }
+      
       const response = await fetch(
-        `${BACKEND_URI}/api/admin/posts?limit=${POSTS_PER_PAGE}&offset=${offset}`,
+        `${BACKEND_URI}/api/admin/posts?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -96,7 +114,7 @@ const PostsTable = forwardRef(({ onEdit }, ref) => {
     } finally {
       setLoading(false);
     }
-  }, [getAccessTokenSilently, loading]);
+  }, [getAccessTokenSilently, loading, filters]);
 
   // Refresh function to reload posts from the beginning
   const refreshPosts = useCallback(() => {
@@ -150,11 +168,17 @@ const PostsTable = forwardRef(({ onEdit }, ref) => {
 
   // Initial load
   useEffect(() => {
-    console.log('Initial load', hasMore);
-    if (hasMore) {
-      fetchPosts(0, false);
-    }
-  }, [fetchPosts]);
+    fetchPosts(0, false);
+  }, []);
+
+  // Filter changes - only when filters are actually applied
+  useEffect(() => {
+    console.log('Applied filters changed');
+    // Reset pagination when filters change
+    setPage(0);
+    setHasMore(true);
+    fetchPosts(0, false);
+  }, [filters.title, filters.status, filters.sort, JSON.stringify(filters.labels), fetchPosts]);
 
   // Action handlers
   const handleEdit = (postId) => {

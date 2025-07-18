@@ -17,8 +17,8 @@ const LabelsSelector = ({
   value = [], 
   onChange, 
   error, 
-  helperText,
-  required = false 
+  required = false,
+  showTitle = true
 }) => {
   const [newLabelInput, setNewLabelInput] = useState('');
   const [inputError, setInputError] = useState('');
@@ -77,16 +77,41 @@ const LabelsSelector = ({
 
   return (
     <Box>
-      <Typography variant="subtitle1" gutterBottom>
-        Labels {required && <span style={{ color: 'red' }}>*</span>}
-      </Typography>
+      {showTitle && (
+        <Typography variant="subtitle1" gutterBottom>
+          Labels {required && <span style={{ color: 'red' }}>*</span>}
+        </Typography>
+      )}
       
+      {/* Add New Label */}
+      <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', mb: 2 }}>
+        <TextField
+          fullWidth
+          size="small"
+          value={newLabelInput}
+          onChange={handleInputChange}
+          onKeyPress={handleKeyPress}
+          placeholder="Enter label name and press Enter or click Add"
+          error={!!inputError}
+          helperText={inputError}
+          label="Add Label"
+          variant="outlined"
+          InputLabelProps={{ shrink: true }}
+        />
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={handleAddLabel}
+          disabled={!newLabelInput.trim()}
+          sx={{ minWidth: 'auto', px: 2 }}
+        >
+          Add
+        </Button>
+      </Box>
+
       {/* Current Labels */}
       {value.length > 0 && (
         <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
-            Current Labels:
-          </Typography>
           <Stack direction="row" spacing={1} flexWrap="wrap">
             {value.map((label, index) => (
               <Chip
@@ -103,31 +128,6 @@ const LabelsSelector = ({
         </Box>
       )}
 
-      {/* Add New Label */}
-      <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', mb: 2 }}>
-        <TextField
-          fullWidth
-          size="small"
-          value={newLabelInput}
-          onChange={handleInputChange}
-          onKeyPress={handleKeyPress}
-          placeholder="Enter label name and press Enter or click Add"
-          error={!!inputError}
-          helperText={inputError}
-          label="Add Label"
-        />
-        <Button
-          variant="contained"
-          size="small"
-          startIcon={<AddIcon />}
-          onClick={handleAddLabel}
-          disabled={!newLabelInput.trim()}
-          sx={{ minWidth: 'auto', px: 2 }}
-        >
-          Add
-        </Button>
-      </Box>
-
       {/* Validation Error */}
       {error && (
         <Alert severity="error" sx={{ mb: 1 }}>
@@ -135,13 +135,6 @@ const LabelsSelector = ({
         </Alert>
       )}
       
-      {/* Helper Text */}
-      {helperText && !error && (
-        <Typography variant="caption" color="text.secondary">
-          {helperText}
-        </Typography>
-      )}
-
       {/* Requirement Notice */}
       {required && value.length === 0 && (
         <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>

@@ -178,7 +178,7 @@ async function createPost(postData) {
       CreatedOn: db.fn.now(),
       UpdatedOn: db.fn.now(),
       IsPremium: postData.isPremium,
-      Status: postData.status !== undefined ? postData.status : 0, // Default to DRAFT (0)
+      Status: getPostStatusDBValue(postData.status),
       Likes: 0,
       Dislikes: 0,
       Comments: 0,
