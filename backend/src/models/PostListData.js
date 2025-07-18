@@ -8,6 +8,7 @@ class PostListData {
       createdOn = null,
       isPremium = null,
       reaction = null,
+      isFavorite = null,
       numberOfLikes = null,
       numberOfDislikes = null,
       numberOfComments = null,
@@ -22,6 +23,7 @@ class PostListData {
       this.createdOn = createdOn;
       this.isPremium = isPremium;
       this.reaction = reaction;
+      this.isFavorite = isFavorite;
       this.numberOfLikes = numberOfLikes;
       this.numberOfDislikes = numberOfDislikes;
       this.numberOfComments = numberOfComments;

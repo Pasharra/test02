@@ -10,6 +10,7 @@ class PostDetailData {
     updatedOn = null,
     isPremium = null,
     reaction = null,
+    isFavorite = null,
     numberOfLikes = null,
     numberOfDislikes = null,
     numberOfComments = null,
@@ -27,6 +28,7 @@ class PostDetailData {
     this.updatedOn = updatedOn;
     this.isPremium = isPremium;
     this.reaction = reaction;
+    this.isFavorite = isFavorite;
     this.numberOfLikes = numberOfLikes;
     this.numberOfDislikes = numberOfDislikes;
     this.numberOfComments = numberOfComments;

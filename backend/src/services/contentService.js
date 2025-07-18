@@ -5,6 +5,7 @@ const UserData = require('../models/UserData');
 const PostListData = require('../models/PostListData');
 const PostDetailData = require('../models/PostDetailData');
 const CommentData = require('../models/CommentData');
+const PostFilter = require('../models/PostFilter');
 
 const { getPostStatusName, getPostStatusDBValue } = require('../utils/postStatusHelper');
 
@@ -83,12 +84,13 @@ async function getOrCreateUser(userData, auth0Id, isAdmin = false) {
  * @param {number} userId - Optional user ID to get user-specific reactions
  * @param {number} limit - Optional limit for pagination (default: 50)
  * @param {number} offset - Optional offset for pagination (default: 0)
+ * @param {PostFilter} filter - Optional filter parameters
+ * @param {boolean} favoriteOnly - If true and userId provided, show only favorite posts (default: false)
  * @returns {Promise<PostListData[]>} Array of PostListData objects
  */
-// TODO: add search parameters - title & labels
-async function getPostList(userId = null, limit = 50, offset = 0) {
+async function getPostList(userId = null, limit = 50, offset = 0, filter = null, favoriteOnly = false) {
   // Build the main query using counter fields from Posts table
-  const query = db('Posts as p')
+  let query = db('Posts as p')
     .select([
       'p.Id as id',
       'p.Image as image',
@@ -104,9 +106,48 @@ async function getPostList(userId = null, limit = 50, offset = 0) {
       // User's reaction (if userId provided)
       userId ? 
         db.raw(`(SELECT upr."Reaction" FROM "UserPostReaction" upr WHERE upr."PostId" = p."Id" AND upr."UserId" = ?) as reaction`, [userId]) :
-        db.raw('NULL as reaction')
+        db.raw('NULL as reaction'),
+      // User's favorite status (if userId provided)
+      userId ? 
+        db.raw(`(SELECT EXISTS (SELECT 1 FROM "FavoritePosts" fp WHERE fp."UserId" = ? AND fp."PostId" = p."Id")) as isFavorite`, [userId]) :
+        db.raw('NULL as isFavorite')
     ])
-    .where('p.Status', 1) // Only include published posts
+    .where('p.Status', 1); // Only include published posts
+
+  // Apply favorite filter if requested
+  if (favoriteOnly && userId) {
+    query = query.whereExists(function() {
+      this.select('*')
+        .from('FavoritePosts as fp')
+        .whereRaw('"fp"."PostId" = "p"."Id"')
+        .where('fp.UserId', userId);
+    });
+  }
+
+  // Apply filters if provided
+  if (filter && filter.hasFilters()) {
+    // Title filter - starts with
+    if (filter.title) {
+      query = query.where('p.Title', 'ilike', `${filter.title}%`);
+    }
+
+    // Labels filter - post must have all specified labels
+    if (filter.labels && filter.labels.length > 0) {
+      // For each label, ensure the post has it
+      filter.labels.forEach(label => {
+        query = query.whereExists(function() {
+          this.select('*')
+            .from('PostLabels as pl')
+            .join('Labels as l', 'pl.LabelId', 'l.Id')
+            .whereRaw('"pl"."PostId" = "p"."Id"')
+            .where('l.Caption', label);
+        });
+      });
+    }
+  }
+
+  // Apply sorting and pagination
+  query = query
     .orderBy('p.CreatedOn', 'desc')
     .limit(limit)
     .offset(offset);
@@ -144,6 +185,7 @@ async function getPostList(userId = null, limit = 50, offset = 0) {
     isPremium: post.isPremium,
     status: getPostStatusName(post.status),
     reaction: post.reaction,
+    isFavorite: post.isFavorite,
     numberOfLikes: post.numberOfLikes || 0,
     numberOfDislikes: post.numberOfDislikes || 0,
     numberOfComments: post.numberOfComments || 0,
@@ -177,7 +219,11 @@ async function getPostById(postId, userId = null) {
       // User's reaction (if userId provided)
       userId ? 
         db.raw(`(SELECT upr.Reaction FROM UserPostReaction upr WHERE upr.PostId = p.Id AND upr.UserId = ?) as reaction`, [userId]) :
-        db.raw('NULL as reaction')
+        db.raw('NULL as reaction'),
+      // User's favorite status (if userId provided)
+      userId ? 
+        db.raw(`(SELECT EXISTS (SELECT 1 FROM "FavoritePosts" fp WHERE fp."UserId" = ? AND fp."PostId" = p."Id")) as isFavorite`, [userId]) :
+        db.raw('NULL as isFavorite')
     ])
     .where('p.Id', postId)
     .where('p.Status', 1) // Only include published posts
@@ -210,6 +256,7 @@ async function getPostById(postId, userId = null) {
     isPremium: post.isPremium,
     status: getPostStatusName(post.status),
     reaction: post.reaction,
+    isFavorite: post.isFavorite,
     numberOfLikes: post.numberOfLikes || 0,
     numberOfDislikes: post.numberOfDislikes || 0,
     numberOfComments: post.numberOfComments || 0,

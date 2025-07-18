@@ -3,14 +3,34 @@ const router = express.Router();
 const { isUserAdmin } = require('../utils/authHelper');
 const { getPostList, getPostById, tryGetUserId } = require('../services/contentService');
 const { getSubscriptionStatus } = require('../services/subscriptionService');
+const PostFilter = require('../models/PostFilter');
 
 // GET /api/content/posts
-// Query params: limit, offset (both optional)
+// Query params: limit, offset, title, labels, favoriteOnly (all optional)
+// Note: status filter is not supported as public API only shows published posts
 router.get('/posts', async (req, res) => {
   try {
     // Parse query parameters
     const limit = req.query.limit ? parseInt(req.query.limit) : 50;
     const offset = req.query.offset ? parseInt(req.query.offset) : 0;
+    const favoriteOnly = req.query.favoriteOnly === 'true';
+    
+    // Parse filter parameters (excluding status since public API only shows published posts)
+    const filterOptions = {};
+    if (req.query.title) {
+      filterOptions.title = req.query.title;
+    }
+    if (req.query.labels) {
+      // Support both single label and comma-separated labels
+      if (Array.isArray(req.query.labels)) {
+        filterOptions.labels = req.query.labels;
+      } else {
+        filterOptions.labels = req.query.labels.split(',').map(label => label.trim()).filter(label => label.length > 0);
+      }
+    }
+
+    // Create filter object
+    const filter = new PostFilter(filterOptions);
     
     // Validate query parameters
     if (isNaN(limit) || limit < 1 || limit > 100) {
@@ -20,13 +40,28 @@ router.get('/posts', async (req, res) => {
       return res.status(400).json({ error: 'Invalid offset parameter. Must be 0 or greater.' });
     }
 
+    // Basic filter validation
+    if (filter.title && (typeof filter.title !== 'string' || filter.title.trim().length === 0)) {
+      return res.status(400).json({ error: 'Title filter must be a non-empty string.' });
+    }
+    if (filter.labels && filter.labels.length > 0) {
+      if (!Array.isArray(filter.labels)) {
+        return res.status(400).json({ error: 'Labels filter must be an array.' });
+      }
+      for (const label of filter.labels) {
+        if (typeof label !== 'string' || label.trim().length === 0) {
+          return res.status(400).json({ error: 'All label filters must be non-empty strings.' });
+        }
+      }
+    }
+
     // Try to get auth0 user id from auth token (optional)
     const auth0Id = req.auth && req.auth.sub;
     // Try to resolve DB user id by auth0 id
     const userId = await tryGetUserId(auth0Id);
 
     // Get posts list
-    const posts = await getPostList(userId, limit, offset);
+    const posts = await getPostList(userId, limit, offset, filter.hasFilters() ? filter : null, favoriteOnly);
     
     res.json({
       success: true,
@@ -35,7 +70,12 @@ router.get('/posts', async (req, res) => {
         limit,
         offset,
         count: posts.length
-      }
+      },
+      filters: filter.hasFilters() ? {
+        title: filter.title,
+        labels: filter.labels
+      } : null,
+      favoriteOnly
     });
   } catch (err) {
     console.error('GET /api/content/posts error:', err.message);
