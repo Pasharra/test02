@@ -1,14 +1,26 @@
 const express = require('express');
 const router = express.Router();
-const { isUserAdmin } = require('../utils/authHelper');
-const { getPostList, getPostById, tryGetUserId } = require('../services/contentService');
+const { isUserAdmin, checkJwt } = require('../utils/authHelper');
+const { getPostList, getPostById, tryGetUserId, setUserPostReaction } = require('../services/contentService');
 const { getSubscriptionStatus } = require('../services/subscriptionService');
 const PostFilter = require('../models/PostFilter');
+
+// Middleware to optionally parse JWT token
+const optionalAuth = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    // If there's an auth header, use checkJwt middleware
+    checkJwt(req, res, next);
+  } else {
+    // No auth header, continue without authentication
+    next();
+  }
+};
 
 // GET /api/content/posts
 // Query params: limit, offset, title, labels, favoriteOnly (all optional)
 // Note: status filter is not supported as public API only shows published posts
-router.get('/posts', async (req, res) => {
+router.get('/posts', optionalAuth, async (req, res) => {
   try {
     // Parse query parameters
     const limit = req.query.limit ? parseInt(req.query.limit) : 50;
@@ -143,6 +155,49 @@ router.get('/posts/:id', async (req, res) => {
     console.error('GET /api/content/posts/:id error:', err.message);
     res.status(500).json({ error: 'Failed to fetch post.' });
   }
+});
+
+// Helper function for post reactions
+async function handlePostReaction(req, res, reaction, actionName) {
+  try {
+    const postId = parseInt(req.params.id);
+    const userId = await tryGetUserId(req.auth.sub);
+
+    if (!postId || isNaN(postId)) {
+      return res.status(400).json({ error: 'Invalid post ID' });
+    }
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    const result = await setUserPostReaction(userId, postId, reaction);
+
+    if (result.error) {
+      return res.status(result.status || 500).json({ error: result.error });
+    }
+
+    res.json({
+      success: true,
+      reaction: reaction,
+      likes: result.likes,
+      dislikes: result.dislikes
+    });
+
+  } catch (err) {
+    console.error(`POST /api/content/posts/:id/${actionName} error:`, err);
+    res.status(500).json({ error: `Failed to ${actionName} post.` });
+  }
+}
+
+// POST /api/content/posts/:id/like
+router.post('/posts/:id/like', checkJwt, async (req, res) => {
+  await handlePostReaction(req, res, 1, 'like'); // 1 = like
+});
+
+// POST /api/content/posts/:id/dislike
+router.post('/posts/:id/dislike', checkJwt, async (req, res) => {
+  await handlePostReaction(req, res, 2, 'dislike'); // 2 = dislike
 });
 
 module.exports = router; 

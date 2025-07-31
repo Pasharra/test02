@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Card,
   CardContent,
@@ -8,7 +8,8 @@ import {
   Chip,
   IconButton,
   Tooltip,
-  Stack
+  Stack,
+  CircularProgress
 } from '@mui/material';
 import {
   ThumbUp,
@@ -18,15 +19,60 @@ import {
   Lock,
   Comment
 } from '@mui/icons-material';
+import { useAuth0 } from '@auth0/auth0-react';
 
-const PostCard = ({ post, onLike, onDislike, onFavorite }) => {
-  const handleLike = () => {
-    if (onLike) onLike(post.id);
+const PostCard = ({ post: initialPost, onFavorite }) => {
+  const { isAuthenticated, getAccessTokenSilently } = useAuth0();
+  const [post, setPost] = useState(initialPost);
+  const [loading, setLoading] = useState({ like: false, dislike: false });
+
+  // Determine user's current reaction: 1 = like, 2 = dislike, null = no reaction
+  const userReaction = post.reaction;
+  const hasLiked = userReaction === 1;
+  const hasDisliked = userReaction === 2;
+
+  const handleReaction = async (action, reactionValue) => {
+    if (!isAuthenticated) return;
+    
+    setLoading(prev => ({ ...prev, [action]: true }));
+    
+    try {
+      const token = await getAccessTokenSilently();
+      const response = await fetch(
+        `${process.env.REACT_APP_BACKEND_URI}/api/content/posts/${post.id}/${action}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to ${action} post`);
+      }
+
+      const data = await response.json();
+      
+      // Update post data with new counts and user reaction
+      setPost(prev => ({
+        ...prev,
+        numberOfLikes: data.likes,
+        numberOfDislikes: data.dislikes,
+        reaction: data.reaction
+      }));
+
+    } catch (error) {
+      console.error(`Error ${action}ing post:`, error);
+      // TODO: Show error message to user
+    } finally {
+      setLoading(prev => ({ ...prev, [action]: false }));
+    }
   };
 
-  const handleDislike = () => {
-    if (onDislike) onDislike(post.id);
-  };
+  const handleLike = () => handleReaction('like', 1);
+  const handleDislike = () => handleReaction('dislike', 2);
 
   const handleFavorite = () => {
     if (onFavorite) onFavorite(post.id);
@@ -88,35 +134,74 @@ const PostCard = ({ post, onLike, onDislike, onFavorite }) => {
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {/* Left side - Action buttons */}
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <IconButton 
-              size="small" 
-              onClick={handleLike}
-              color={post.userReaction === 'like' ? 'primary' : 'default'}
-            >
-              <ThumbUp fontSize="small" />
-            </IconButton>
+            {/* Like Button */}
+            <Tooltip title={!isAuthenticated ? 'Login to like posts' : hasLiked ? 'You liked this post' : 'Like this post'}>
+              <span>
+                <IconButton 
+                  size="small" 
+                  onClick={handleLike}
+                  disabled={!isAuthenticated || hasLiked || loading.like}
+                  color={hasLiked ? 'primary' : 'default'}
+                  sx={{ 
+                    opacity: !isAuthenticated ? 0.5 : 1,
+                    '&.Mui-disabled': {
+                      color: hasLiked ? 'primary.main' : 'inherit'
+                    }
+                  }}
+                >
+                  {loading.like ? (
+                    <CircularProgress size={16} />
+                  ) : (
+                    <ThumbUp fontSize="small" />
+                  )}
+                </IconButton>
+              </span>
+            </Tooltip>
             <Typography variant="caption" sx={{ mr: 2 }}>
               {post.numberOfLikes || 0}
             </Typography>
 
-            <IconButton 
-              size="small" 
-              onClick={handleDislike}
-              color={post.userReaction === 'dislike' ? 'error' : 'default'}
-            >
-              <ThumbDown fontSize="small" />
-            </IconButton>
+            {/* Dislike Button */}
+            <Tooltip title={!isAuthenticated ? 'Login to dislike posts' : hasDisliked ? 'You disliked this post' : 'Dislike this post'}>
+              <span>
+                <IconButton 
+                  size="small" 
+                  onClick={handleDislike}
+                  disabled={!isAuthenticated || hasDisliked || loading.dislike}
+                  color={hasDisliked ? 'error' : 'default'}
+                  sx={{ 
+                    opacity: !isAuthenticated ? 0.5 : 1,
+                    '&.Mui-disabled': {
+                      color: hasDisliked ? 'error.main' : 'inherit'
+                    }
+                  }}
+                >
+                  {loading.dislike ? (
+                    <CircularProgress size={16} />
+                  ) : (
+                    <ThumbDown fontSize="small" />
+                  )}
+                </IconButton>
+              </span>
+            </Tooltip>
             <Typography variant="caption" sx={{ mr: 2 }}>
               {post.numberOfDislikes || 0}
             </Typography>
 
-            <IconButton 
-              size="small" 
-              onClick={handleFavorite}
-              color={post.isFavorite ? 'error' : 'default'}
-            >
-              {post.isFavorite ? <Favorite fontSize="small" /> : <FavoriteBorder fontSize="small" />}
-            </IconButton>
+            {/* Favorite Button */}
+            <Tooltip title={!isAuthenticated ? 'Login to favorite posts' : post.isFavorite ? 'Remove from favorites' : 'Add to favorites'}>
+              <span>
+                <IconButton 
+                  size="small" 
+                  onClick={handleFavorite}
+                  disabled={!isAuthenticated}
+                  color={post.isFavorite ? 'error' : 'default'}
+                  sx={{ opacity: !isAuthenticated ? 0.5 : 1 }}
+                >
+                  {post.isFavorite ? <Favorite fontSize="small" /> : <FavoriteBorder fontSize="small" />}
+                </IconButton>
+              </span>
+            </Tooltip>
           </Box>
 
           {/* Right side - Comments counter */}

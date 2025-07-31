@@ -264,10 +264,68 @@ async function getPostById(postId, userId = null) {
   });
 }
 
+// Set user reaction to a post (like/dislike)
+// reaction: 1 = like, 2 = dislike
+async function setUserPostReaction(userId, postId, reaction) {
+  // First, check if the post exists
+  const post = await db('Posts').where('Id', postId).first();
+  if (!post) {
+    return { error: 'Post not found', status: 400 };
+  }
+
+  // Check if user already has a reaction to this post
+  const existingReaction = await db('UserPostReaction')
+    .where({ UserId: userId, PostId: postId })
+    .first();
+
+  if (existingReaction) {
+    // Update existing reaction
+    await db('UserPostReaction')
+      .where({ UserId: userId, PostId: postId })
+      .update({ Reaction: reaction });
+  } else {
+    // Create new reaction
+    await db('UserPostReaction').insert({
+      UserId: userId,
+      PostId: postId,
+      Reaction: reaction
+    });
+  }
+
+  // Recalculate likes and dislikes for the post
+  const likesCount = await db('UserPostReaction')
+    .where({ PostId: postId, Reaction: 1 })
+    .count('* as count')
+    .first();
+
+  const dislikesCount = await db('UserPostReaction')
+    .where({ PostId: postId, Reaction: 2 })
+    .count('* as count')
+    .first();
+
+  const likes = parseInt(likesCount.count) || 0;
+  const dislikes = parseInt(dislikesCount.count) || 0;
+
+  // Update the post's like and dislike counts
+  await db('Posts')
+    .where('Id', postId)
+    .update({
+      Likes: likes,
+      Dislikes: dislikes
+    });
+
+  return {
+    success: true,
+    likes: likes,
+    dislikes: dislikes
+  };
+}
+
 module.exports = {
   updateUser,
   getOrCreateUser,
   getPostList,
   getPostById,
   tryGetUserId,
+  setUserPostReaction,
 }; 

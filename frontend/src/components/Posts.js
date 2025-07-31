@@ -262,8 +262,6 @@ const Posts = () => {
             <PostCard
               key={post.id}
               post={post}
-              onLike={handleLike}
-              onDislike={handleDislike}
               onFavorite={handleFavorite}
             />
           ))}
