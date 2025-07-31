@@ -60,6 +60,11 @@ const Header = () => {
     navigate('/admin/content');
   };
 
+  const handlePosts = () => {
+    handleClose();
+    navigate('/posts');
+  };
+
   const handleLogout = async () => {
     handleClose();
     setLogoutError('');
@@ -96,8 +101,10 @@ const Header = () => {
             {isUserAdmin(user) && [
               <MenuItem key="dashboard" onClick={handleDashboard}>Dashboard</MenuItem>,
               <MenuItem key="content" onClick={handleContent}>Content</MenuItem>,
-              <Divider key="admin-divider" />
+              <Divider />
             ]}
+            <MenuItem onClick={handlePosts}>Posts</MenuItem>
+            <Divider />
             <MenuItem onClick={handleProfile}>Profile</MenuItem>
             <MenuItem onClick={handleSettings}>Settings</MenuItem>
             <Divider />

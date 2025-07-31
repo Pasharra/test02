@@ -5,6 +5,7 @@ import Profile from './components/Profile';
 import Settings from './components/Settings';
 import AdminDashboard from './components/AdminDashboard';
 import ContentManagement from './components/ContentManagement';
+import Posts from './components/Posts';
 import { CssBaseline, Box, Typography, Button } from '@mui/material';
 import { useAuth0 } from '@auth0/auth0-react';
 import { isUserAdmin } from './components/Profile';
@@ -12,13 +13,8 @@ import { isUserAdmin } from './components/Profile';
 function PostFeed() {
   const { isAuthenticated, isLoading } = useAuth0();
   if (isLoading) return <Box mt={6} textAlign="center"><Typography>Loading...</Typography></Box>;
-  console.log('PostFeed isAuthenticated: ' + isAuthenticated);
-  return (
-    <Box mt={6} textAlign="center">
-      <Typography variant="h4">Welcome to the AI Content Web App!</Typography>
-      <Typography variant="body1" mt={2}>This is the post feed. (Placeholder)</Typography>
-    </Box>
-  );
+  if (!isAuthenticated) return <Navigate to="/" replace />;
+  return <Posts />;
 }
 
 function Admin() {
@@ -67,6 +63,7 @@ function App() {
       <Header />
       <Routes>
         <Route path="/feed" element={<PostFeed />} />
+        <Route path="/posts" element={<PostFeed />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/admin/content" element={<AdminContent />} />
         <Route path="/profile" element={<Profile />} />
