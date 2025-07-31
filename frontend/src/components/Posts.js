@@ -8,7 +8,10 @@ import {
   Alert,
   TextField,
   Button,
-  Stack
+  Stack,
+  Checkbox,
+  FormControlLabel,
+  Grid
 } from '@mui/material';
 import { Search as SearchIcon } from '@mui/icons-material';
 import { useAuth0 } from '@auth0/auth0-react';
@@ -27,11 +30,13 @@ const Posts = () => {
   // Filter states
   const [filters, setFilters] = useState({
     title: '',
-    labels: []
+    labels: [],
+    favoriteOnly: false
   });
   const [tempFilters, setTempFilters] = useState({
     title: '',
-    labels: []
+    labels: [],
+    favoriteOnly: false
   });
 
   const limit = 10;
@@ -58,6 +63,10 @@ const Posts = () => {
       
       if (filters.labels && filters.labels.length > 0) {
         filters.labels.forEach(label => params.append('labels', label));
+      }
+      
+      if (filters.favoriteOnly) {
+        params.append('favoriteOnly', 'true');
       }
       
       const response = await fetch(
@@ -118,7 +127,8 @@ const Posts = () => {
 
   const hasFilterChanges = () => {
     return tempFilters.title !== filters.title || 
-           JSON.stringify(tempFilters.labels) !== JSON.stringify(filters.labels);
+           JSON.stringify(tempFilters.labels) !== JSON.stringify(filters.labels) ||
+           tempFilters.favoriteOnly !== filters.favoriteOnly;
   };
 
   // Initial load
@@ -135,7 +145,7 @@ const Posts = () => {
     setOffset(0);
     setHasMore(true);
     fetchPosts(true);
-  }, [filters.title, JSON.stringify(filters.labels)]);
+  }, [filters.title, JSON.stringify(filters.labels), filters.favoriteOnly]);
 
   // Intersection Observer for infinite scroll
   useEffect(() => {
@@ -202,12 +212,27 @@ const Posts = () => {
             sx={{ width: '100%', minWidth: '100%' }}
           />
 
-          {/* Second Row: Labels */}
-          <LabelsSelector
-            value={tempFilters.labels}
-            onChange={(labels) => handleTempFilterChange('labels', labels)}
-            showTitle={false}
-          />
+          {/* Second Row: Favorites Checkbox and Labels */}
+          <Grid container spacing={2} alignItems="flex-start">
+            <Grid item xs={12} sm={3}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={tempFilters.favoriteOnly}
+                    onChange={(e) => handleTempFilterChange('favoriteOnly', e.target.checked)}
+                  />
+                }
+                label="Favorites Only"
+              />
+            </Grid>
+            <Grid item xs={12} sm={9}>
+              <LabelsSelector
+                value={tempFilters.labels}
+                onChange={(labels) => handleTempFilterChange('labels', labels)}
+                showTitle={false}
+              />
+            </Grid>
+          </Grid>
 
           {/* Apply Filters Button */}
           {hasFilterChanges() && (
@@ -262,7 +287,6 @@ const Posts = () => {
             <PostCard
               key={post.id}
               post={post}
-              onFavorite={handleFavorite}
             />
           ))}
         </Box>

@@ -21,10 +21,15 @@ import {
 } from '@mui/icons-material';
 import { useAuth0 } from '@auth0/auth0-react';
 
-const PostCard = ({ post: initialPost, onFavorite }) => {
+const PostCard = ({ post: initialPost }) => {
   const { isAuthenticated, getAccessTokenSilently } = useAuth0();
   const [post, setPost] = useState(initialPost);
-  const [loading, setLoading] = useState({ like: false, dislike: false });
+  const [loading, setLoading] = useState({ like: false, dislike: false, favorite: false });
+
+  // Update local state when initialPost prop changes
+  React.useEffect(() => {
+    setPost(initialPost);
+  }, [initialPost]);
 
   // Determine user's current reaction: 1 = like, 2 = dislike, null = no reaction
   const userReaction = post.reaction;
@@ -74,8 +79,44 @@ const PostCard = ({ post: initialPost, onFavorite }) => {
   const handleLike = () => handleReaction('like', 1);
   const handleDislike = () => handleReaction('dislike', 2);
 
-  const handleFavorite = () => {
-    if (onFavorite) onFavorite(post.id);
+  const handleFavorite = async () => {
+    if (!isAuthenticated) return;
+    
+    setLoading(prev => ({ ...prev, favorite: true }));
+    
+    try {
+      const token = await getAccessTokenSilently();
+      const action = post.isFavorite ? 'unfavorite' : 'favorite';
+      
+      const response = await fetch(
+        `${process.env.REACT_APP_BACKEND_URI}/api/content/posts/${post.id}/${action}`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to ${action} post`);
+      }
+
+      const data = await response.json();
+      
+      // Update post data with new favorite status
+      setPost(prev => ({
+        ...prev,
+        isFavorite: data.isFavorite
+      }));
+
+    } catch (error) {
+      console.error(`Error ${post.isFavorite ? 'unfavoriting' : 'favoriting'} post:`, error);
+      // TODO: Show error message to user
+    } finally {
+      setLoading(prev => ({ ...prev, favorite: false }));
+    }
   };
 
   return (
@@ -188,20 +229,25 @@ const PostCard = ({ post: initialPost, onFavorite }) => {
               {post.numberOfDislikes || 0}
             </Typography>
 
-            {/* Favorite Button */}
-            <Tooltip title={!isAuthenticated ? 'Login to favorite posts' : post.isFavorite ? 'Remove from favorites' : 'Add to favorites'}>
-              <span>
+            {/* Favorite Button - Only show for authenticated users */}
+            {isAuthenticated && (
+              <Tooltip title={post.isFavorite ? 'Remove from favorites' : 'Add to favorites'}>
                 <IconButton 
                   size="small" 
                   onClick={handleFavorite}
-                  disabled={!isAuthenticated}
+                  disabled={loading.favorite}
                   color={post.isFavorite ? 'error' : 'default'}
-                  sx={{ opacity: !isAuthenticated ? 0.5 : 1 }}
                 >
-                  {post.isFavorite ? <Favorite fontSize="small" /> : <FavoriteBorder fontSize="small" />}
+                  {loading.favorite ? (
+                    <CircularProgress size={16} />
+                  ) : post.isFavorite ? (
+                    <Favorite fontSize="small" />
+                  ) : (
+                    <FavoriteBorder fontSize="small" />
+                  )}
                 </IconButton>
-              </span>
-            </Tooltip>
+              </Tooltip>
+            )}
           </Box>
 
           {/* Right side - Comments counter */}

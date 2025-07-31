@@ -34,4 +34,14 @@ function checkAdmin(req, res, next) {
   next();
 }
 
-module.exports = { checkJwt, isUserAdmin, checkAdmin }; 
+/**
+ * Middleware to check if user is logged in
+ */
+function checkLoggedIn(req, res, next) {
+  if (!req.auth) {
+    return res.status(403).json({ error: 'User not logged in.' });
+  }
+  next();
+}
+
+module.exports = { checkJwt, isUserAdmin, checkAdmin, checkLoggedIn }; 

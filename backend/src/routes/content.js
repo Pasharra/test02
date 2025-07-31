@@ -1,26 +1,21 @@
 const express = require('express');
 const router = express.Router();
-const { isUserAdmin, checkJwt } = require('../utils/authHelper');
-const { getPostList, getPostById, tryGetUserId, setUserPostReaction } = require('../services/contentService');
+const { isUserAdmin, checkJwt, checkLoggedIn } = require('../utils/authHelper');
+const { getPostList, getPostById, tryGetUserId, setUserPostReaction, setFavoritePost, removeFavoritePost, getOrCreateUser } = require('../services/contentService');
 const { getSubscriptionStatus } = require('../services/subscriptionService');
 const PostFilter = require('../models/PostFilter');
+const UserData = require('../models/UserData');
 
-// Middleware to optionally parse JWT token
-const optionalAuth = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    // If there's an auth header, use checkJwt middleware
-    checkJwt(req, res, next);
-  } else {
-    // No auth header, continue without authentication
-    next();
-  }
-};
+async function getOrCreateUserFromJWT(req) {
+  const user_id = req.auth && req.auth.sub;
+  const userData = UserData.fromAuth0User(req.auth);
+  return await getOrCreateUser(userData, user_id, isUserAdmin(req));
+}
 
 // GET /api/content/posts
 // Query params: limit, offset, title, labels, favoriteOnly (all optional)
 // Note: status filter is not supported as public API only shows published posts
-router.get('/posts', optionalAuth, async (req, res) => {
+router.get('/posts', checkJwt, async (req, res) => {
   try {
     // Parse query parameters
     const limit = req.query.limit ? parseInt(req.query.limit) : 50;
@@ -74,7 +69,7 @@ router.get('/posts', optionalAuth, async (req, res) => {
 
     // Get posts list
     const posts = await getPostList(userId, limit, offset, filter.hasFilters() ? filter : null, favoriteOnly);
-    
+        
     res.json({
       success: true,
       posts,
@@ -161,15 +156,10 @@ router.get('/posts/:id', async (req, res) => {
 async function handlePostReaction(req, res, reaction, actionName) {
   try {
     const postId = parseInt(req.params.id);
-    const userId = await tryGetUserId(req.auth.sub);
-
     if (!postId || isNaN(postId)) {
       return res.status(400).json({ error: 'Invalid post ID' });
     }
-
-    if (!userId) {
-      return res.status(401).json({ error: 'User not found' });
-    }
+    const userId = await getOrCreateUserFromJWT(req);
 
     const result = await setUserPostReaction(userId, postId, reaction);
 
@@ -191,13 +181,63 @@ async function handlePostReaction(req, res, reaction, actionName) {
 }
 
 // POST /api/content/posts/:id/like
-router.post('/posts/:id/like', checkJwt, async (req, res) => {
+router.post('/posts/:id/like', checkJwt, checkLoggedIn, async (req, res) => {
   await handlePostReaction(req, res, 1, 'like'); // 1 = like
 });
 
 // POST /api/content/posts/:id/dislike
-router.post('/posts/:id/dislike', checkJwt, async (req, res) => {
+router.post('/posts/:id/dislike', checkJwt, checkLoggedIn, async (req, res) => {
   await handlePostReaction(req, res, 2, 'dislike'); // 2 = dislike
+});
+
+// POST /api/content/posts/:id/favorite
+router.post('/posts/:id/favorite', checkJwt, checkLoggedIn, async (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    if (!postId || isNaN(postId)) {
+      return res.status(400).json({ error: 'Invalid post ID' });
+    }
+    const userId = await getOrCreateUserFromJWT(req);
+
+    const result = await setFavoritePost(postId, userId);
+    if (result.error) {
+      return res.status(result.status || 500).json({ error: result.error });
+    }
+
+    res.json({
+      success: true,
+      isFavorite: result.isFavorite
+    });
+
+  } catch (err) {
+    console.error('POST /api/content/posts/:id/favorite error:', err);
+    res.status(500).json({ error: 'Failed to favorite post.' });
+  }
+});
+
+// POST /api/content/posts/:id/unfavorite
+router.post('/posts/:id/unfavorite', checkJwt, checkLoggedIn, async (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    if (!postId || isNaN(postId)) {
+      return res.status(400).json({ error: 'Invalid post ID' });
+    }
+    const userId = await getOrCreateUserFromJWT(req);
+
+    const result = await removeFavoritePost(postId, userId);
+    if (result.error) {
+      return res.status(result.status || 500).json({ error: result.error });
+    }
+
+    res.json({
+      success: true,
+      isFavorite: result.isFavorite
+    });
+
+  } catch (err) {
+    console.error('POST /api/content/posts/:id/unfavorite error:', err);
+    res.status(500).json({ error: 'Failed to unfavorite post.' });
+  }
 });
 
 module.exports = router; 

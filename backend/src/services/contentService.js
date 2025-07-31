@@ -109,8 +109,8 @@ async function getPostList(userId = null, limit = 50, offset = 0, filter = null,
         db.raw('NULL as reaction'),
       // User's favorite status (if userId provided)
       userId ? 
-        db.raw(`(SELECT EXISTS (SELECT 1 FROM "FavoritePosts" fp WHERE fp."UserId" = ? AND fp."PostId" = p."Id")) as isFavorite`, [userId]) :
-        db.raw('NULL as isFavorite')
+        db.raw(`(SELECT CASE WHEN EXISTS (SELECT 1 FROM "FavoritePosts" fp WHERE fp."UserId" = ? AND fp."PostId" = p."Id") THEN true ELSE false END) as "isFavorite"`, [userId]) :
+        db.raw('NULL as "isFavorite"')
     ])
     .where('p.Status', 1); // Only include published posts
 
@@ -183,13 +183,13 @@ async function getPostList(userId = null, limit = 50, offset = 0, filter = null,
     readingTime: post.readingTime,
     createdOn: post.createdOn,
     isPremium: post.isPremium,
-    status: getPostStatusName(post.status),
     reaction: post.reaction,
     isFavorite: post.isFavorite,
     numberOfLikes: post.numberOfLikes || 0,
     numberOfDislikes: post.numberOfDislikes || 0,
     numberOfComments: post.numberOfComments || 0,
-    labels: labelsMap[post.id] || []
+    labels: labelsMap[post.id] || [],
+    status: getPostStatusName(post.status)
   }));
 }
 
@@ -222,8 +222,8 @@ async function getPostById(postId, userId = null) {
         db.raw('NULL as reaction'),
       // User's favorite status (if userId provided)
       userId ? 
-        db.raw(`(SELECT EXISTS (SELECT 1 FROM "FavoritePosts" fp WHERE fp."UserId" = ? AND fp."PostId" = p."Id")) as isFavorite`, [userId]) :
-        db.raw('NULL as isFavorite')
+        db.raw(`(SELECT CASE WHEN EXISTS (SELECT 1 FROM "FavoritePosts" fp WHERE fp."UserId" = ? AND fp."PostId" = p."Id") THEN true ELSE false END) as "isFavorite"`, [userId]) :
+        db.raw('NULL as "isFavorite"')
     ])
     .where('p.Id', postId)
     .where('p.Status', 1) // Only include published posts
@@ -254,13 +254,14 @@ async function getPostById(postId, userId = null) {
     createdOn: post.createdOn,
     updatedOn: post.updatedOn,
     isPremium: post.isPremium,
-    status: getPostStatusName(post.status),
     reaction: post.reaction,
     isFavorite: post.isFavorite,
     numberOfLikes: post.numberOfLikes || 0,
     numberOfDislikes: post.numberOfDislikes || 0,
     numberOfComments: post.numberOfComments || 0,
-    labels: labels
+    labels: labels,
+    comments: [], // TODO: add comments
+    status: getPostStatusName(post.status)
   });
 }
 
@@ -321,6 +322,46 @@ async function setUserPostReaction(userId, postId, reaction) {
   };
 }
 
+// Add post to user's favorites
+async function setFavoritePost(postId, userId) {
+  // First, check if the post exists
+  const post = await db('Posts').where('Id', postId).first();
+  if (!post) {
+    return { error: 'Post not found', status: 400 };
+  }
+
+  // Check if already favorited
+  const existingFavorite = await db('FavoritePosts')
+    .where({ UserId: userId, PostId: postId })
+    .first();
+
+  if (!existingFavorite) {
+    // Add to favorites
+    await db('FavoritePosts').insert({
+      UserId: userId,
+      PostId: postId
+    });
+  }
+
+  return { success: true, isFavorite: true };
+}
+
+// Remove post from user's favorites
+async function removeFavoritePost(postId, userId) {
+  // First, check if the post exists
+  const post = await db('Posts').where('Id', postId).first();
+  if (!post) {
+    return { error: 'Post not found', status: 400 };
+  }
+
+  // Remove from favorites if exists
+  await db('FavoritePosts')
+    .where({ UserId: userId, PostId: postId })
+    .del();
+
+  return { success: true, isFavorite: false };
+}
+
 module.exports = {
   updateUser,
   getOrCreateUser,
@@ -328,4 +369,6 @@ module.exports = {
   getPostById,
   tryGetUserId,
   setUserPostReaction,
+  setFavoritePost,
+  removeFavoritePost,
 }; 
