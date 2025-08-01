@@ -1,8 +1,6 @@
 class CommentData {
   constructor({
     id = null,
-    userId = null,
-    postId = null,
     content = '',
     createdOn = null,
     userFirstName = '',
@@ -10,8 +8,6 @@ class CommentData {
     userAvatar = '',
   } = {}) {
     this.id = id;
-    this.userId = userId;
-    this.postId = postId;
     this.content = content;
     this.createdOn = createdOn;
     this.userFirstName = userFirstName;

@@ -261,7 +261,6 @@ async function getPostById(postId, userId = null) {
     numberOfDislikes: post.numberOfDislikes || 0,
     numberOfComments: post.numberOfComments || 0,
     labels: labels,
-    comments: [], // TODO: add comments
     status: getPostStatusName(post.status)
   });
 }
@@ -391,6 +390,86 @@ async function TrackPostView(postId, userId) {
   }
 }
 
+/**
+ * Get comments for a specific post
+ * @param {number} postId - The ID of the post to get comments for
+ * @param {number} limit - Maximum number of comments to return (default: 50)
+ * @param {number} offset - Number of comments to skip for pagination (default: 0)
+ * @returns {Promise<CommentData[]>} Array of CommentData objects
+ */
+async function getPostComments(postId, limit = 50, offset = 0) {
+  const query = db('PostComments as pc')
+    .join('Users as u', 'pc.UserId', 'u.Id')
+    .select([
+      'pc.Id as id',
+      'pc.Content as content',
+      'pc.CreatedOn as createdOn',
+      'u.FirstName as userFirstName',
+      'u.LastName as userLastName',
+      'u.Avatar as userAvatar'
+    ])
+    .where('pc.PostId', postId)
+    .orderBy('pc.CreatedOn', 'desc')
+    .limit(limit)
+    .offset(offset);
+
+  const rows = await query;
+  
+  return rows.map(row => new CommentData({
+    id: row.id,
+    content: row.content,
+    createdOn: row.createdOn,
+    userFirstName: row.userFirstName || '',
+    userLastName: row.userLastName || '',
+    userAvatar: row.userAvatar || ''
+  }));
+}
+
+/**
+ * Add a new comment to a post
+ * @param {number} postId - The ID of the post to comment on
+ * @param {number} userId - The ID of the user making the comment
+ * @param {string} content - The comment content
+ * @returns {Promise<CommentData>} The created comment data
+ */
+async function addPostComment(postId, userId, content) {
+  // First, check if the post exists
+  const post = await db('Posts').where('Id', postId).first();
+  if (!post) {
+    return { error: 'Post not found', status: 404 };
+  }
+
+  // Insert the new comment
+  const [commentId] = await db('PostComments').insert({
+    PostId: postId,
+    UserId: userId,
+    Content: content
+  }).returning('Id');
+
+  // Get the complete comment data with user information
+  const commentRow = await db('PostComments as pc')
+    .join('Users as u', 'pc.UserId', 'u.Id')
+    .select([
+      'pc.Id as id',
+      'pc.Content as content',
+      'pc.CreatedOn as createdOn',
+      'u.FirstName as userFirstName',
+      'u.LastName as userLastName',
+      'u.Avatar as userAvatar'
+    ])
+    .where('pc.Id', commentId)
+    .first();
+
+  return new CommentData({
+    id: commentRow.id,
+    content: commentRow.content,
+    createdOn: commentRow.createdOn,
+    userFirstName: commentRow.userFirstName || '',
+    userLastName: commentRow.userLastName || '',
+    userAvatar: commentRow.userAvatar || ''
+  });
+}
+
 module.exports = {
   updateUser,
   getOrCreateUser,
@@ -401,4 +480,6 @@ module.exports = {
   setFavoritePost,
   removeFavoritePost,
   TrackPostView,
+  getPostComments,
+  addPostComment,
 }; 

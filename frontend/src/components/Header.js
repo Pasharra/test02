@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AppBar, Toolbar, IconButton, Avatar, Menu, MenuItem, Box, Tooltip, Divider, Alert } from '@mui/material';
+import { AppBar, Toolbar, IconButton, Avatar, Menu, MenuItem, Box, Tooltip, Divider, Alert, Typography } from '@mui/material';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useNavigate } from 'react-router-dom';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
@@ -78,7 +78,10 @@ const Header = () => {
   return (
     <>
       <AppBar position="static" color="default" elevation={1}>
-        <Toolbar sx={{ justifyContent: 'flex-end' }}>
+        <Toolbar>
+          <Typography variant="h6" component="div" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+            AI Portal
+          </Typography>
           <Box sx={{ flexGrow: 1 }} />
           <Tooltip title={user?.email || ''}>
             <IconButton onClick={handleMenu} size="large" sx={{ ml: 2 }}>

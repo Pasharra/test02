@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { isUserAdmin, checkJwt, checkLoggedIn } = require('../utils/authHelper');
-const { getPostList, getPostById, tryGetUserId, setUserPostReaction, setFavoritePost, removeFavoritePost, getOrCreateUser, TrackPostView } = require('../services/contentService');
+const { getPostList, getPostById, tryGetUserId, setUserPostReaction, setFavoritePost, removeFavoritePost, getOrCreateUser, TrackPostView, getPostComments, addPostComment } = require('../services/contentService');
 const { getSubscriptionStatus } = require('../services/subscriptionService');
 const PostFilter = require('../models/PostFilter');
 const UserData = require('../models/UserData');
@@ -240,6 +240,94 @@ router.post('/posts/:id/unfavorite', checkJwt, checkLoggedIn, async (req, res) =
   } catch (err) {
     console.error('POST /api/content/posts/:id/unfavorite error:', err);
     res.status(500).json({ error: 'Failed to unfavorite post.' });
+  }
+});
+
+// GET /api/content/posts/:id/comments
+router.get('/posts/:id/comments', async (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    
+    // Validate post ID
+    if (isNaN(postId) || postId <= 0) {
+      return res.status(400).json({ error: 'Invalid post ID.' });
+    }
+
+    // Parse pagination parameters
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = parseInt(req.query.offset) || 0;
+
+    // Validate pagination parameters
+    if (limit < 1 || limit > 100) {
+      return res.status(400).json({ error: 'Limit must be between 1 and 100.' });
+    }
+    if (offset < 0) {
+      return res.status(400).json({ error: 'Offset must be non-negative.' });
+    }
+
+    // Get comments for the post
+    const comments = await getPostComments(postId, limit, offset);
+
+    res.json({
+      success: true,
+      comments,
+      pagination: {
+        limit,
+        offset,
+        count: comments.length
+      }
+    });
+
+  } catch (err) {
+    console.error('GET /api/content/posts/:id/comments error:', err);
+    res.status(500).json({ error: 'Failed to fetch comments.' });
+  }
+});
+
+// POST /api/content/posts/:id/comments
+router.post('/posts/:id/comments', checkJwt, checkLoggedIn, async (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    
+    // Validate post ID
+    if (isNaN(postId) || postId <= 0) {
+      return res.status(400).json({ error: 'Invalid post ID.' });
+    }
+
+    // Validate request body
+    const { content } = req.body;
+    if (!content || typeof content !== 'string') {
+      return res.status(400).json({ error: 'Comment content is required and must be a string.' });
+    }
+
+    // Validate content length
+    const trimmedContent = content.trim();
+    if (trimmedContent.length === 0) {
+      return res.status(400).json({ error: 'Comment content cannot be empty.' });
+    }
+    if (trimmedContent.length > 500) {
+      return res.status(400).json({ error: 'Comment content cannot exceed 500 characters.' });
+    }
+
+    // Get user ID from JWT
+    const userId = await getOrCreateUserFromJWT(req);
+
+    // Add the comment
+    const result = await addPostComment(postId, userId, trimmedContent);
+
+    // Check if there was an error (e.g., post not found)
+    if (result.error) {
+      return res.status(result.status || 500).json({ error: result.error });
+    }
+
+    res.status(201).json({
+      success: true,
+      comment: result
+    });
+
+  } catch (err) {
+    console.error('POST /api/content/posts/:id/comments error:', err);
+    res.status(500).json({ error: 'Failed to add comment.' });
   }
 });
 
