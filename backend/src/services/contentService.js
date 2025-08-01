@@ -440,11 +440,14 @@ async function addPostComment(postId, userId, content) {
   }
 
   // Insert the new comment
-  const [commentId] = await db('PostComments').insert({
+  const [insertResult] = await db('PostComments').insert({
     PostId: postId,
     UserId: userId,
     Content: content
   }).returning('Id');
+
+  // Extract the actual ID value (handle both object and primitive returns)
+  const commentId = typeof insertResult === 'object' ? insertResult.Id : insertResult;
 
   // Get the complete comment data with user information
   const commentRow = await db('PostComments as pc')
@@ -459,6 +462,18 @@ async function addPostComment(postId, userId, content) {
     ])
     .where('pc.Id', commentId)
     .first();
+
+  // Update the post's comments counter
+  const commentsCount = await db('PostComments')
+    .where('PostId', postId)
+    .count('* as count')
+    .first();
+
+  const totalComments = parseInt(commentsCount.count) || 0;
+
+  await db('Posts')
+    .where('Id', postId)
+    .update({ Comments: totalComments });
 
   return new CommentData({
     id: commentRow.id,
