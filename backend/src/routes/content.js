@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { isUserAdmin, checkJwt, checkLoggedIn } = require('../utils/authHelper');
-const { getPostList, getPostById, tryGetUserId, setUserPostReaction, setFavoritePost, removeFavoritePost, getOrCreateUser } = require('../services/contentService');
+const { getPostList, getPostById, tryGetUserId, setUserPostReaction, setFavoritePost, removeFavoritePost, getOrCreateUser, TrackPostView } = require('../services/contentService');
 const { getSubscriptionStatus } = require('../services/subscriptionService');
 const PostFilter = require('../models/PostFilter');
 const UserData = require('../models/UserData');
@@ -85,13 +85,13 @@ router.get('/posts', checkJwt, async (req, res) => {
       favoriteOnly
     });
   } catch (err) {
-    console.error('GET /api/content/posts error:', err.message);
+    console.error('GET /api/content/posts error:', err);
     res.status(500).json({ error: 'Failed to fetch posts.' });
   }
 });
 
 // GET /api/content/posts/:id
-router.get('/posts/:id', async (req, res) => {
+router.get('/posts/:id', checkJwt, async (req, res) => {
   try {
     const postId = parseInt(req.params.id);
     
@@ -102,8 +102,8 @@ router.get('/posts/:id', async (req, res) => {
 
     // Try to get auth0 user id from auth token (optional)
     const auth0Id = req.auth && req.auth.sub;
-    // Try to resolve DB user id by auth0 id
-    const userId = await tryGetUserId(auth0Id);
+    // Try to get user id from auth token (optional)
+    const userId = req.auth ? await getOrCreateUserFromJWT(req) : null;
 
     // Get the post by ID
     const post = await getPostById(postId, userId);
@@ -150,7 +150,7 @@ router.get('/posts/:id', async (req, res) => {
       contentRestricted
     });
   } catch (err) {
-    console.error('GET /api/content/posts/:id error:', err.message);
+    console.error('GET /api/content/posts/:id error:', err);
     res.status(500).json({ error: 'Failed to fetch post.' });
   }
 });
@@ -172,7 +172,7 @@ async function handlePostReaction(req, res, reaction, actionName) {
 
     res.json({
       success: true,
-      reaction: reaction,
+      reaction: result.reaction,
       likes: result.likes,
       dislikes: result.dislikes
     });

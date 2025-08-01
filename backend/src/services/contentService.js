@@ -218,7 +218,7 @@ async function getPostById(postId, userId = null) {
       'p.Comments as numberOfComments',
       // User's reaction (if userId provided)
       userId ? 
-        db.raw(`(SELECT upr.Reaction FROM UserPostReaction upr WHERE upr.PostId = p.Id AND upr.UserId = ?) as reaction`, [userId]) :
+        db.raw(`(SELECT upr."Reaction" FROM "UserPostReaction" upr WHERE upr."PostId" = p."Id" AND upr."UserId" = ?) as reaction`, [userId]) :
         db.raw('NULL as reaction'),
       // User's favorite status (if userId provided)
       userId ? 
@@ -239,7 +239,8 @@ async function getPostById(postId, userId = null) {
   const labelsQuery = await db('PostLabels as pl')
     .join('Labels as l', 'pl.LabelId', 'l.Id')
     .select('l.Caption')
-    .where('pl.PostId', postId);
+    .where('pl.PostId', postId)
+    .orderBy('l.Caption', 'asc');
 
   const labels = labelsQuery.map(row => row.Caption);
 
@@ -279,11 +280,22 @@ async function setUserPostReaction(userId, postId, reaction) {
     .where({ UserId: userId, PostId: postId })
     .first();
 
+  let finalReaction = null;
+
   if (existingReaction) {
-    // Update existing reaction
-    await db('UserPostReaction')
-      .where({ UserId: userId, PostId: postId })
-      .update({ Reaction: reaction });
+    if (existingReaction.Reaction === reaction) {
+      // User is toggling the same reaction - remove it
+      await db('UserPostReaction')
+        .where({ UserId: userId, PostId: postId })
+        .del();
+      finalReaction = null;
+    } else {
+      // User is changing to a different reaction
+      await db('UserPostReaction')
+        .where({ UserId: userId, PostId: postId })
+        .update({ Reaction: reaction });
+      finalReaction = reaction;
+    }
   } else {
     // Create new reaction
     await db('UserPostReaction').insert({
@@ -291,6 +303,7 @@ async function setUserPostReaction(userId, postId, reaction) {
       PostId: postId,
       Reaction: reaction
     });
+    finalReaction = reaction;
   }
 
   // Recalculate likes and dislikes for the post
@@ -318,7 +331,8 @@ async function setUserPostReaction(userId, postId, reaction) {
   return {
     success: true,
     likes: likes,
-    dislikes: dislikes
+    dislikes: dislikes,
+    reaction: finalReaction
   };
 }
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Card,
   CardContent,
@@ -23,6 +24,7 @@ import { useAuth0 } from '@auth0/auth0-react';
 
 const PostCard = ({ post: initialPost }) => {
   const { isAuthenticated, getAccessTokenSilently } = useAuth0();
+  const navigate = useNavigate();
   const [post, setPost] = useState(initialPost);
   const [loading, setLoading] = useState({ like: false, dislike: false, favorite: false });
 
@@ -78,6 +80,10 @@ const PostCard = ({ post: initialPost }) => {
 
   const handleLike = () => handleReaction('like', 1);
   const handleDislike = () => handleReaction('dislike', 2);
+  
+  const handleNavigateToPost = () => {
+    navigate(`/posts/${post.id}`);
+  };
 
   const handleFavorite = async () => {
     if (!isAuthenticated) return;
@@ -122,9 +128,36 @@ const PostCard = ({ post: initialPost }) => {
   return (
     <Card sx={{ mb: 2, '&:hover': { boxShadow: 3 } }}>
       <CardContent>
+        {/* Post Image */}
+        {post.image && (
+          <CardMedia
+            component="img"
+            height="200"
+            image={post.image}
+            alt={post.title}
+            onClick={handleNavigateToPost}
+            sx={{ 
+              mb: 2, 
+              borderRadius: 1,
+              objectFit: 'cover',
+              cursor: 'pointer',
+              '&:hover': { opacity: 0.8 }
+            }}
+          />
+        )}
+
         {/* Title and Premium Icon */}
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-          <Typography variant="h6" component="h2" sx={{ flexGrow: 1 }}>
+          <Typography 
+            variant="h6" 
+            component="h2" 
+            sx={{ 
+              flexGrow: 1,
+              cursor: 'pointer',
+              '&:hover': { color: 'primary.main' }
+            }}
+            onClick={handleNavigateToPost}
+          >
             {post.title}
           </Typography>
           {post.isPremium && (
@@ -133,21 +166,6 @@ const PostCard = ({ post: initialPost }) => {
             </Tooltip>
           )}
         </Box>
-
-        {/* Post Image */}
-        {post.image && (
-          <CardMedia
-            component="img"
-            height="200"
-            image={post.image}
-            alt={post.title}
-            sx={{ 
-              mb: 2, 
-              borderRadius: 1,
-              objectFit: 'cover'
-            }}
-          />
-        )}
 
         {/* Text Preview */}
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -176,12 +194,12 @@ const PostCard = ({ post: initialPost }) => {
           {/* Left side - Action buttons */}
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             {/* Like Button */}
-            <Tooltip title={!isAuthenticated ? 'Login to like posts' : hasLiked ? 'You liked this post' : 'Like this post'}>
+            <Tooltip title={!isAuthenticated ? 'Login to like posts' : hasLiked ? 'Unlike this post' : 'Like this post'}>
               <span>
                 <IconButton 
                   size="small" 
                   onClick={handleLike}
-                  disabled={!isAuthenticated || hasLiked || loading.like}
+                  disabled={!isAuthenticated || loading.like}
                   color={hasLiked ? 'primary' : 'default'}
                   sx={{ 
                     opacity: !isAuthenticated ? 0.5 : 1,
@@ -203,12 +221,12 @@ const PostCard = ({ post: initialPost }) => {
             </Typography>
 
             {/* Dislike Button */}
-            <Tooltip title={!isAuthenticated ? 'Login to dislike posts' : hasDisliked ? 'You disliked this post' : 'Dislike this post'}>
+            <Tooltip title={!isAuthenticated ? 'Login to dislike posts' : hasDisliked ? 'Remove dislike' : 'Dislike this post'}>
               <span>
                 <IconButton 
                   size="small" 
                   onClick={handleDislike}
-                  disabled={!isAuthenticated || hasDisliked || loading.dislike}
+                  disabled={!isAuthenticated || loading.dislike}
                   color={hasDisliked ? 'error' : 'default'}
                   sx={{ 
                     opacity: !isAuthenticated ? 0.5 : 1,
