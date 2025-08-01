@@ -111,6 +111,9 @@ router.get('/posts/:id', async (req, res) => {
     if (!post) {
       return res.status(404).json({ error: 'Post not found.' });
     }
+    if (userId) {
+      await TrackPostView(postId, userId);
+    }
     
     // Check if post is premium and user has access
     let contentRestricted = false;

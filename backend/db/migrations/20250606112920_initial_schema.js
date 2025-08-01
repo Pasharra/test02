@@ -65,11 +65,9 @@ exports.up = async function(knex) {
 
   await knex.schema.createTable('PostViews', table => {
     table.integer('UserId').nullable();
-    table.integer('PostId').notNullable();
-    table.timestamp('ViewedOn').notNullable().defaultTo(knex.fn.now());
-    table.string('IpAddress', 45).nullable(); // Support both IPv4 and IPv6
-    table.string('UserAgent', 500).nullable();
-    table.primary(['UserId', 'PostId', 'ViewedOn']);
+    table.integer('PostId').nullable();
+    table.timestamp('CreatedOn').notNullable().defaultTo(knex.fn.now());
+    table.primary(['UserId', 'PostId', 'CreatedOn']);
     table.foreign('UserId').references('Users.Id');
     table.foreign('PostId').references('Posts.Id');
   });
@@ -77,7 +75,6 @@ exports.up = async function(knex) {
   await knex.schema.createTable('FavoritePosts', table => {
     table.integer('UserId').notNullable();
     table.integer('PostId').notNullable();
-    table.timestamp('CreatedOn').notNullable().defaultTo(knex.fn.now());
     table.primary(['UserId', 'PostId']);
     table.foreign('UserId').references('Users.Id');
     table.foreign('PostId').references('Posts.Id');
@@ -127,6 +124,46 @@ exports.up = async function(knex) {
     END;
     $$ LANGUAGE plpgsql;
   `);
+
+  // Create stored procedure for tracking post views
+  await knex.raw(`
+    CREATE OR REPLACE FUNCTION spTrackPostView(postId INT, userId INT)
+    RETURNS VOID AS $$
+    DECLARE
+        reading_time INT;
+        last_view_time TIMESTAMP;
+    BEGIN
+        -- Get post reading time, default to 10 if null
+        SELECT COALESCE("ReadingTime", 10) INTO reading_time
+        FROM "Posts"
+        WHERE "Id" = postId;
+        
+        -- If post doesn't exist, exit
+        IF NOT FOUND THEN
+            RETURN;
+        END IF;
+        
+        -- Get the most recent view for this user and post
+        SELECT "CreatedOn" INTO last_view_time
+        FROM "PostViews"
+        WHERE "PostId" = postId AND "UserId" = userId
+        ORDER BY "CreatedOn" DESC
+        LIMIT 1;
+        
+        -- If no previous view or last view was more than reading_time minutes ago
+        IF last_view_time IS NULL OR last_view_time < (NOW() - INTERVAL '1 minute' * reading_time) THEN
+            -- Insert new view record
+            INSERT INTO "PostViews" ("PostId", "UserId", "CreatedOn")
+            VALUES (postId, userId, NOW());
+            
+            -- Update post views counter by counting all records for this post
+            UPDATE "Posts"
+            SET "Views" = (SELECT COUNT(*) FROM "PostViews" WHERE "PostId" = postId)
+            WHERE "Id" = postId;
+        END IF;
+    END;
+    $$ LANGUAGE plpgsql;
+  `);
 };
 
 /**
@@ -135,6 +172,7 @@ exports.up = async function(knex) {
  */
 exports.down = async function(knex) {
   // Drop stored procedures first
+  await knex.raw('DROP FUNCTION IF EXISTS spTrackPostView(INT, INT);');
   await knex.raw('DROP FUNCTION IF EXISTS get_dashboard_metrics();');
   
   // Drop tables in reverse order

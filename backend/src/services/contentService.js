@@ -362,6 +362,21 @@ async function removeFavoritePost(postId, userId) {
   return { success: true, isFavorite: false };
 }
 
+/**
+ * Track a post view by calling the spTrackPostView stored procedure
+ * @param {number} postId - The ID of the post being viewed
+ * @param {number} userId - The ID of the user viewing the post
+ * @returns {Promise<void>}
+ */
+async function TrackPostView(postId, userId) {
+  try {
+    await db.raw('SELECT spTrackPostView(?, ?)', [postId, userId]);
+  } catch (error) {
+    console.error('Error tracking post view:', error);
+    // Don't throw - we don't want view tracking failures to break the main functionality
+  }
+}
+
 module.exports = {
   updateUser,
   getOrCreateUser,
@@ -371,4 +386,5 @@ module.exports = {
   setUserPostReaction,
   setFavoritePost,
   removeFavoritePost,
+  TrackPostView,
 }; 

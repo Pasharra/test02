@@ -111,3 +111,41 @@ BEGIN
          WHERE "CreatedOn" >= NOW() - INTERVAL '30 days' AND "Status" = 1) as new_published_posts_in_last_30_days;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Stored procedure to track post views
+CREATE OR REPLACE FUNCTION spTrackPostView(postId INT, userId INT)
+RETURNS VOID AS $$
+DECLARE
+    reading_time INT;
+    last_view_time TIMESTAMP;
+BEGIN
+    -- Get post reading time, default to 10 if null
+    SELECT COALESCE("ReadingTime", 10) INTO reading_time
+    FROM "Posts"
+    WHERE "Id" = postId;
+    
+    -- If post doesn't exist, exit
+    IF NOT FOUND THEN
+        RETURN;
+    END IF;
+    
+    -- Get the most recent view for this user and post
+    SELECT "CreatedOn" INTO last_view_time
+    FROM "PostViews"
+    WHERE "PostId" = postId AND "UserId" = userId
+    ORDER BY "CreatedOn" DESC
+    LIMIT 1;
+    
+    -- If no previous view or last view was more than reading_time minutes ago
+    IF last_view_time IS NULL OR last_view_time < (NOW() - INTERVAL '1 minute' * reading_time) THEN
+        -- Insert new view record
+        INSERT INTO "PostViews" ("PostId", "UserId", "CreatedOn")
+        VALUES (postId, userId, NOW());
+        
+        -- Update post views counter by counting all records for this post
+        UPDATE "Posts"
+        SET "Views" = (SELECT COUNT(*) FROM "PostViews" WHERE "PostId" = postId)
+        WHERE "Id" = postId;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
