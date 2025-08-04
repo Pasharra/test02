@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Box, 
   Typography, 
@@ -57,6 +58,7 @@ const MetricCard = ({ label, value, isLoading }) => (
 
 const AdminDashboard = () => {
   const { getAccessTokenSilently } = useAuth0();
+  const navigate = useNavigate();
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -134,6 +136,11 @@ const AdminDashboard = () => {
 
     fetchMetrics();
   }, [getAccessTokenSilently]);
+
+  // Handle navigation to post detail view
+  const handlePostClick = (postId) => {
+    navigate(`/posts/${postId}`);
+  };
 
   // Debug logging for chart data
   if (metrics) {
@@ -278,7 +285,18 @@ const AdminDashboard = () => {
                 </Typography>
                 {metrics.top5MostLikedPosts.map((post, index) => (
                   <Box key={index} sx={{ py: 1, borderBottom: index < 4 ? '1px solid #eee' : 'none' }}>
-                    <Typography variant="body2" noWrap>
+                    <Typography 
+                      variant="body2" 
+                      noWrap
+                      sx={{ 
+                        cursor: 'pointer',
+                        color: 'primary.main',
+                        '&:hover': {
+                          textDecoration: 'underline'
+                        }
+                      }}
+                      onClick={() => handlePostClick(post.id)}
+                    >
                       {post.title}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
@@ -298,7 +316,18 @@ const AdminDashboard = () => {
                 </Typography>
                 {metrics.top5MostCommentedPosts.map((post, index) => (
                   <Box key={index} sx={{ py: 1, borderBottom: index < 4 ? '1px solid #eee' : 'none' }}>
-                    <Typography variant="body2" noWrap>
+                    <Typography 
+                      variant="body2" 
+                      noWrap
+                      sx={{ 
+                        cursor: 'pointer',
+                        color: 'primary.main',
+                        '&:hover': {
+                          textDecoration: 'underline'
+                        }
+                      }}
+                      onClick={() => handlePostClick(post.id)}
+                    >
                       {post.title}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">

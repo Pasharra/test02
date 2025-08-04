@@ -364,16 +364,18 @@ async function getMetrics() {
       db.raw('SELECT * FROM get_dashboard_metrics()'),
       // TODO: Pie chart or breakdown of subscription plan distribution (monthly vs. yearly)
       getNumberOfActiveSubscriptions(),
-      db.raw('SELECT "Title", "Likes" FROM "Posts" WHERE "Status" = 1 ORDER BY "Likes" DESC LIMIT 5'),
-      db.raw('SELECT "Title", "Comments" FROM "Posts" WHERE "Status" = 1 ORDER BY "Comments" DESC LIMIT 5')
+      db.raw('SELECT "Id", "Title", "Likes" FROM "Posts" WHERE "Status" = 1 ORDER BY "Likes" DESC LIMIT 5'),
+      db.raw('SELECT "Id", "Title", "Comments" FROM "Posts" WHERE "Status" = 1 ORDER BY "Comments" DESC LIMIT 5')
     ]);
     
     const metrics = dbResult.rows[0];
     const top5MostLikedPosts = mostLikedResult.rows.map(row => new PostListData({
+      id: row.Id,
       title: row.Title,
       numberOfLikes: row.Likes
     }));
     const top5MostCommentedPosts = mostCommentedResult.rows.map(row => new PostListData({
+      id: row.Id,
       title: row.Title,
       numberOfComments: row.Comments
     }));
