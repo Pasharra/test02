@@ -10,6 +10,7 @@ const notificationRoute = require('./src/routes/notification');
 const subscriptionRoute = require('./src/routes/subscription');
 const contentRoute = require('./src/routes/content');
 const adminRoute = require('./src/routes/admin');
+const chatRoute = require('./src/routes/chat');
 
 app.use(express.json());
 
@@ -63,6 +64,7 @@ app.use('/api/notification', notificationRoute);
 app.use('/api/subscription', subscriptionRoute);
 app.use('/api/content', contentRoute);
 app.use('/api/admin', adminRoute);
+app.use('/api/chat', chatRoute);
 
 const PORT = config.PORT;
 app.listen(PORT, () => {

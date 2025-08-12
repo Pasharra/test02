@@ -28,4 +28,6 @@ module.exports = {
 
   FRONTEND_URI: process.env.FRONTEND_URI,
   PORT: process.env.PORT || 3000,
+
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
 }; 
