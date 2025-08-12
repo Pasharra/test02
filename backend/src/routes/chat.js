@@ -2,6 +2,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const OpenAI = require('openai');
 const config = require('../utils/config');
+const { checkJwt, checkLoggedIn } = require('../utils/authHelper');
 
 const router = express.Router();
 
@@ -37,6 +38,55 @@ const SYSTEM_MESSAGE = {
 Ваша цель - помочь владельцам лучше понимать и заботиться о своих питомцах.`
 };
 
+// Retry function for OpenAI API calls with exponential backoff
+async function callOpenAIWithRetry(messages, maxRetries = 2) {
+  const delays = [250, 800]; // Exponential backoff delays in ms
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: messages,
+        temperature: 0.7,
+        max_tokens: 700,
+      });
+      
+      return completion;
+    } catch (error) {
+      const isRetryableError = error.status === 429 || (error.status >= 500 && error.status < 600);
+      const isLastAttempt = attempt === maxRetries;
+      
+      if (!isRetryableError || isLastAttempt) {
+        throw error; // Re-throw if not retryable or last attempt
+      }
+      
+      // Wait before retry
+      const delay = delays[attempt] || delays[delays.length - 1];
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      console.log(`OpenAI API retry attempt ${attempt + 1} after ${delay}ms delay`);
+    }
+  }
+}
+
+// Function to strip dangerous control characters
+function stripDangerousChars(text) {
+  // Remove control characters except newline, carriage return, and tab
+  return text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+}
+
+// Function to truncate message history (keep last 12 messages excluding system)
+function truncateHistory(messages) {
+  const systemMessages = messages.filter(msg => msg.role === 'system');
+  const nonSystemMessages = messages.filter(msg => msg.role !== 'system');
+  
+  // Keep only last 12 non-system messages
+  const truncatedNonSystem = nonSystemMessages.slice(-12);
+  
+  // Combine system messages with truncated history
+  return [...systemMessages, ...truncatedNonSystem];
+}
+
 // Validation function for messages array
 function validateMessages(messages) {
   if (!Array.isArray(messages)) {
@@ -55,13 +105,35 @@ function validateMessages(messages) {
     if (!message.content || typeof message.content !== 'string') {
       return 'Each message must have content as a string';
     }
+
+    // Validate content length
+    if (message.content.length > 2000) {
+      return 'Each message content must be 2000 characters or less';
+    }
   }
 
   return null;
 }
 
+// Function to sanitize messages
+function sanitizeMessages(messages) {
+  return messages.map(message => ({
+    ...message,
+    content: stripDangerousChars(message.content)
+  }));
+}
+
+// Function to log analytics
+function logChatAnalytics(userId, tokensUsed, latency) {
+  const timestamp = new Date().toISOString();
+  console.log(`[CHAT_ANALYTICS] ${timestamp} | User: ${userId} | Tokens: ${tokensUsed} | Latency: ${latency}ms`);
+}
+
 // POST /api/chat endpoint
-router.post('/', chatRateLimit, async (req, res) => {
+router.post('/', checkJwt, checkLoggedIn, chatRateLimit, async (req, res) => {
+  const startTime = Date.now();
+  const userId = req.auth && req.auth.sub;
+  
   try {
     const { messages } = req.body;
 
@@ -75,21 +147,22 @@ router.post('/', chatRateLimit, async (req, res) => {
       return res.status(400).json({ error: validationError });
     }
 
+    // Sanitize messages (strip dangerous control characters)
+    let sanitizedMessages = sanitizeMessages(messages);
+
+    // Truncate history (keep last 12 messages excluding system)
+    sanitizedMessages = truncateHistory(sanitizedMessages);
+
     // Prepare messages array - prepend system message if not present
-    let conversationMessages = [...messages];
-    const hasSystemMessage = messages.some(msg => msg.role === 'system');
+    let conversationMessages = [...sanitizedMessages];
+    const hasSystemMessage = sanitizedMessages.some(msg => msg.role === 'system');
     
     if (!hasSystemMessage) {
       conversationMessages.unshift(SYSTEM_MESSAGE);
     }
 
-    // Call OpenAI Chat Completions API
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', // Using gpt-4o-mini as specified
-      messages: conversationMessages,
-      temperature: 0.7,
-      max_tokens: 700,
-    });
+    // Call OpenAI Chat Completions API with retry logic
+    const completion = await callOpenAIWithRetry(conversationMessages);
 
     // Extract assistant response
     const assistantMessage = completion.choices[0]?.message?.content;
@@ -98,10 +171,19 @@ router.post('/', chatRateLimit, async (req, res) => {
       return res.status(500).json({ error: 'No response from OpenAI' });
     }
 
+    // Calculate latency and log analytics
+    const latency = Date.now() - startTime;
+    const tokensUsed = completion.usage?.total_tokens || 0;
+    logChatAnalytics(userId, tokensUsed, latency);
+
     // Return response
     res.json({ message: assistantMessage });
 
   } catch (error) {
+    // Log analytics for failed requests too
+    const latency = Date.now() - startTime;
+    logChatAnalytics(userId, 0, latency);
+    
     console.error('Chat API error:', error);
 
     // Handle OpenAI API errors
