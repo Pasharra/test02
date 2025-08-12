@@ -70,6 +70,11 @@ const Header = () => {
     navigate('/chat');
   };
 
+  const handleChatBot = () => {
+    handleClose();
+    navigate('/chatbot');
+  };
+
   const handleLogout = async () => {
     handleClose();
     setLogoutError('');
@@ -113,6 +118,7 @@ const Header = () => {
             ]}
             <MenuItem onClick={handlePosts}>Posts</MenuItem>
             <MenuItem onClick={handleChat}>Chat</MenuItem>
+            <MenuItem onClick={handleChatBot}>Chat Bot</MenuItem>
             <Divider />
             <MenuItem onClick={handleProfile}>Profile</MenuItem>
             <MenuItem onClick={handleSettings}>Settings</MenuItem>

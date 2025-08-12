@@ -8,6 +8,7 @@ import ContentManagement from './components/ContentManagement';
 import Posts from './components/Posts';
 import PostDetailView from './components/PostDetailView';
 import Chat from './components/Chat';
+import ChatBot from './components/ChatBot';
 import { CssBaseline, Box, Typography, Button } from '@mui/material';
 import { useAuth0 } from '@auth0/auth0-react';
 import { isUserAdmin } from './components/Profile';
@@ -68,6 +69,7 @@ function App() {
         <Route path="/posts" element={<PostFeed />} />
         <Route path="/posts/:id" element={<PostDetailView />} />
         <Route path="/chat" element={<Chat />} />
+        <Route path="/chatbot" element={<ChatBot />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/admin/content" element={<AdminContent />} />
         <Route path="/profile" element={<Profile />} />
